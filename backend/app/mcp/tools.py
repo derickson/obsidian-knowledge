@@ -4,8 +4,9 @@ from app.config import settings
 from app.search.client import search_notes, semantic_search
 from app.search.indexer import index_note, reindex_all
 from app.sync import run_ob_sync
+from app.search.indexer import delete_from_index
 from app.vault.reader import read_note, list_notes
-from app.vault.writer import write_note
+from app.vault.writer import write_note, delete_note
 
 mcp_auth = None
 if settings.mcp_api_key:
@@ -87,6 +88,22 @@ async def create(path: str, content: str, metadata: dict | None = None) -> dict:
     index_note(note)
     await run_ob_sync()
     return {"status": "created", "path": path}
+
+
+@mcp.tool()
+async def delete(path: str) -> dict:
+    """Delete a single note from the knowledge base.
+
+    Removes the note from both the vault and the Elasticsearch index,
+    then syncs the change to Obsidian cloud.
+
+    Args:
+        path: Path of the note to delete (e.g., "People/Old Note.md")
+    """
+    delete_note(path)
+    delete_from_index(path)
+    await run_ob_sync()
+    return {"status": "deleted", "path": path}
 
 
 @mcp.tool()
