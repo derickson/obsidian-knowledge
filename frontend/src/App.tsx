@@ -251,7 +251,7 @@ export default function App() {
       if (href?.startsWith("http://") || href?.startsWith("https://")) {
         return (
           <a href={href} {...props} target="_blank" rel="noopener noreferrer">
-            {children}
+            {children} ↗
           </a>
         );
       }
