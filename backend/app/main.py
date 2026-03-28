@@ -12,10 +12,13 @@ from app.search.client import _es_client, get_es_client
 
 prefix = settings.api_prefix
 
+mcp_app = mcp.http_app(path="/")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    async with mcp_app.lifespan(app):
+        yield
     if _es_client is not None:
         _es_client.close()
 
@@ -36,4 +39,4 @@ app.include_router(notes_router, prefix=f"{prefix}/api/notes", tags=["notes"])
 app.include_router(admin_router, prefix=f"{prefix}/api/admin", tags=["admin"])
 
 # Mount MCP server
-app.mount(f"{prefix}/mcp", mcp.http_app())
+app.mount(f"{prefix}/mcp", mcp_app)
