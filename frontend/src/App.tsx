@@ -53,7 +53,6 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NoteListItem[]>([]);
   const [selected, setSelected] = useState<NoteDetail | null>(null);
-  const [mode, setMode] = useState<"fulltext" | "semantic">("semantic");
   const [dark, setDark] = useState(
     window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
@@ -104,8 +103,7 @@ export default function App() {
       if (data?.results) setResults(data.results);
       return;
     }
-    const endpoint =
-      mode === "semantic" ? `${API}semantic-search/` : `${API}search/`;
+    const endpoint = `${API}semantic-search/`;
     const resp = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -597,14 +595,6 @@ export default function App() {
           placeholder="Search notes..."
           style={theme.searchInput}
         />
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as "fulltext" | "semantic")}
-          style={theme.select}
-        >
-          <option value="semantic">Semantic</option>
-          <option value="fulltext">Full-text</option>
-        </select>
         <button
           onClick={() => {
             handleSearch();
