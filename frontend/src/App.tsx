@@ -114,7 +114,7 @@ export default function App() {
   };
 
   const handleSelect = async (path: string) => {
-    const resp = await fetch(`${API}${encodeURIComponent(path)}`);
+    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
     if (resp.ok) {
       setSelected(await resp.json());
       if (isMobile) setMobileView("detail");
@@ -307,7 +307,7 @@ export default function App() {
     const path = `Observations/${dateStr}-Daily.md`;
 
     // Try to read it first
-    const resp = await fetch(`${API}${encodeURIComponent(path)}`);
+    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
     if (resp.ok) {
       setSelected(await resp.json());
       if (isMobile) setMobileView("detail");
@@ -331,7 +331,7 @@ export default function App() {
     });
 
     // Now read and select it
-    const readResp = await fetch(`${API}${encodeURIComponent(path)}`);
+    const readResp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
     if (readResp.ok) {
       setSelected(await readResp.json());
       if (isMobile) setMobileView("detail");
