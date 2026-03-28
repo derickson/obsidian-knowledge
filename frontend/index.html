@@ -16,6 +16,92 @@
       .theme-dark a { color: #a78bfa; }
       .theme-dark a:visited { color: #c4b5fd; }
       .theme-dark a:hover { color: #ddd6fe; text-decoration: underline; }
+
+      /* ── Markdown outline styling ── */
+
+      /* Headers: colored, sized, with left border accent */
+      .theme-light h1 { color: #7c3aed; font-size: 1.5em; margin: 1.2em 0 0.4em; border-left: 4px solid #7c3aed; padding-left: 12px; }
+      .theme-light h2 { color: #6d28d9; font-size: 1.25em; margin: 1em 0 0.3em; border-left: 3px solid #6d28d9; padding-left: 12px; }
+      .theme-light h3 { color: #5b21b6; font-size: 1.1em; margin: 0.8em 0 0.3em; padding-left: 20px; }
+      .theme-light h4 { color: #4c1d95; font-size: 1em; margin: 0.6em 0 0.2em; padding-left: 28px; }
+      .theme-light h5, .theme-light h6 { color: #4c1d95; font-size: 0.95em; margin: 0.5em 0 0.2em; padding-left: 36px; }
+
+      .theme-dark h1 { color: #a78bfa; font-size: 1.5em; margin: 1.2em 0 0.4em; border-left: 4px solid #a78bfa; padding-left: 12px; }
+      .theme-dark h2 { color: #8b5cf6; font-size: 1.25em; margin: 1em 0 0.3em; border-left: 3px solid #8b5cf6; padding-left: 12px; }
+      .theme-dark h3 { color: #7c3aed; font-size: 1.1em; margin: 0.8em 0 0.3em; padding-left: 20px; }
+      .theme-dark h4 { color: #6d28d9; font-size: 1em; margin: 0.6em 0 0.2em; padding-left: 28px; }
+      .theme-dark h5, .theme-dark h6 { color: #6d28d9; font-size: 0.95em; margin: 0.5em 0 0.2em; padding-left: 36px; }
+
+      /* Body text under headers: indented to match */
+      .theme-light h1 ~ p, .theme-light h1 ~ ul, .theme-light h1 ~ ol,
+      .theme-dark h1 ~ p, .theme-dark h1 ~ ul, .theme-dark h1 ~ ol { padding-left: 16px; }
+
+      /* Lists */
+      .theme-light ul, .theme-light ol,
+      .theme-dark ul, .theme-dark ol { padding-left: 28px; margin: 0.4em 0; }
+
+      .theme-light li, .theme-dark li { margin: 0.2em 0; }
+
+      /* Paragraphs */
+      .theme-light p, .theme-dark p { margin: 0.5em 0; }
+
+      /* Blockquotes */
+      .theme-light blockquote {
+        border-left: 3px solid #d1d5db;
+        padding: 0.4em 0 0.4em 16px;
+        margin: 0.6em 0;
+        color: #6b7280;
+        font-style: italic;
+      }
+      .theme-dark blockquote {
+        border-left: 3px solid #4b5563;
+        padding: 0.4em 0 0.4em 16px;
+        margin: 0.6em 0;
+        color: #9ca3af;
+        font-style: italic;
+      }
+
+      /* Code blocks */
+      .theme-light pre {
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin: 0.6em 0;
+        overflow-x: auto;
+        font-size: 0.9em;
+      }
+      .theme-dark pre {
+        background: #1e1e3a;
+        border: 1px solid #2a2a4a;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin: 0.6em 0;
+        overflow-x: auto;
+        font-size: 0.9em;
+      }
+
+      /* Inline code */
+      .theme-light code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+      .theme-dark code { background: #1e1e3a; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+      .theme-light pre code, .theme-dark pre code { background: none; padding: 0; }
+
+      /* Tables */
+      .theme-light table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
+      .theme-light th, .theme-light td { border: 1px solid #e5e7eb; padding: 6px 12px; text-align: left; }
+      .theme-light th { background: #f3f4f6; font-weight: 600; }
+
+      .theme-dark table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
+      .theme-dark th, .theme-dark td { border: 1px solid #2a2a4a; padding: 6px 12px; text-align: left; }
+      .theme-dark th { background: #1e1e3a; font-weight: 600; }
+
+      /* Horizontal rules */
+      .theme-light hr { border: none; border-top: 1px solid #e5e7eb; margin: 1em 0; }
+      .theme-dark hr { border: none; border-top: 1px solid #2a2a4a; margin: 1em 0; }
+
+      /* Strong / bold */
+      .theme-light strong { color: #111827; }
+      .theme-dark strong { color: #f3f4f6; }
     </style>
   </head>
   <body>
