@@ -560,12 +560,12 @@ export default function App() {
         <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
           Obsidian Knowledge
         </h1>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 6 }}>
           <button onClick={handleToday} style={theme.iconButton} title="Today's observations">
-            &#x1F4C5;
+            📅
           </button>
           <button onClick={() => setShowInfo(true)} style={theme.iconButton} title="Connection info">
-            &#x2139;&#xFE0E;
+            ℹ️
           </button>
           {!isMobile && (
             <button
@@ -573,7 +573,7 @@ export default function App() {
               style={theme.iconButton}
               title={chatOpen ? "Close chat" : "Open chat"}
             >
-              {chatOpen ? "&#x2715;" : "&#x1F4AC;"}
+              {chatOpen ? "✖️" : "💬"}
             </button>
           )}
           <button
@@ -581,7 +581,7 @@ export default function App() {
             style={theme.iconButton}
             title="Toggle theme"
           >
-            {dark ? "&#x2600;&#xFE0E;" : "&#x263D;"}
+            {dark ? "☀️" : "🌙"}
           </button>
         </div>
       </header>
@@ -708,14 +708,13 @@ const themes = {
       color: "#1a1a1a",
     },
     iconButton: {
-      background: "none",
-      border: "none",
+      background: "#f0f0f0",
+      border: "1px solid #ddd",
+      borderRadius: 8,
       cursor: "pointer" as const,
-      fontSize: 18,
+      fontSize: 16,
       padding: "4px 8px",
-      color: "#555",
-      filter: "grayscale(1)",
-      opacity: 0.8,
+      lineHeight: 1,
     },
     searchBar: {
       display: "flex" as const,
@@ -965,14 +964,13 @@ const themes = {
       color: "#e0e0e0",
     },
     iconButton: {
-      background: "none",
-      border: "none",
+      background: "#2a2a4a",
+      border: "1px solid #3a3a5a",
+      borderRadius: 8,
       cursor: "pointer" as const,
-      fontSize: 18,
+      fontSize: 16,
       padding: "4px 8px",
-      color: "#aaa",
-      filter: "grayscale(1)",
-      opacity: 0.8,
+      lineHeight: 1,
     },
     searchBar: {
       display: "flex" as const,
