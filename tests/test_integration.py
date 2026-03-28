@@ -161,7 +161,7 @@ class TestNoteLifecycle:
 
     def test_11_verify_deleted_from_es(self, backend):
         """Confirm the note is gone from Elasticsearch."""
-        time.sleep(3)  # Wait for ES to reflect the deletion
+        time.sleep(5)  # Wait for ES Serverless to reflect the deletion
         resp = backend.post(
             f"{API_PREFIX}/api/notes/search/",
             json={"query": UNIQUE_KEYWORD, "size": 5},
