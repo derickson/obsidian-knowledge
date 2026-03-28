@@ -21,8 +21,10 @@ if settings.mcp_api_key:
 mcp = FastMCP(
     "Obsidian Knowledge",
     auth=mcp_auth,
-    instructions="""You are connected to an Obsidian-backed knowledge base. Notes are markdown
-files with YAML frontmatter for metadata and [[wikilinks]] for cross-referencing.
+    instructions="""You are connected to Dave Erickson's personal Obsidian-backed knowledge base.
+The user is Dave Erickson. When the user says "my", "I", or "me", they mean Dave Erickson.
+
+Notes are markdown files with YAML frontmatter for metadata and [[wikilinks]] for cross-referencing.
 
 ## Vault organization
 
