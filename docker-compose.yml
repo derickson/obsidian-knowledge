@@ -3,11 +3,12 @@ services:
     build:
       context: .
       dockerfile: obsidian-headless/Dockerfile
+    user: "1000:1000"
     ports:
       - "3104:3104"
     volumes:
       - ./vaults:/app/vaults
-      - /home/dave/.config/obsidian-headless:/root/.config/obsidian-headless
+      - /home/dave/.config/obsidian-headless:/home/dave/.config/obsidian-headless
       - ./vaults/AgentKnowledge:/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge
     env_file:
       - .env
