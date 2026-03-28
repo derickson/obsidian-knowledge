@@ -17,7 +17,36 @@ if settings.mcp_api_key:
         scopes=[],
     )
 
-mcp = FastMCP("Obsidian Knowledge", auth=mcp_auth)
+mcp = FastMCP(
+    "Obsidian Knowledge",
+    auth=mcp_auth,
+    instructions="""You are connected to an Obsidian-backed knowledge base. Notes are markdown
+files with YAML frontmatter for metadata and [[wikilinks]] for cross-referencing.
+
+## Vault organization
+
+- **Root level**: Primary entries on people, concepts, or tools (e.g., `Dave Erickson.md`, `Elasticsearch.md`)
+- **Meetings/**: Time-driven meeting notes as `Meetings/YYYY-MM-DD-Meeting-Name.md`
+- **Observations/**: Journal entries, thoughts, and general observations as `Observations/YYYY-MM-DD-Topic.md`
+- **Content/**: Notes on consumed content (videos, articles, books) as `Content/YYYY-MM-DD-Title.md`
+- **Inbox/**: Staging area for unsorted or auto-ingested notes
+- **TestData/**: Reserved for automated tests — do not use
+
+## Writing notes
+
+- Use `[[wikilinks]]` to link between notes (e.g., `[[Dave Erickson]]`, `[[Elasticsearch]]`)
+- Add relevant tags in metadata: `{"tags": ["meeting", "elasticsearch"], "source": "zoom"}`
+- Content should be markdown. Frontmatter metadata is optional but encouraged.
+- When creating notes about a topic that likely has an existing entry, search first to avoid duplicates.
+- Prefer linking to existing notes over repeating information.
+
+## Searching
+
+- Use `semantic` for natural language questions (hybrid BM25 + vector search)
+- Use `search` for exact keyword matching
+- Use `list_all_notes` to browse by folder
+""",
+)
 
 
 @mcp.tool()
