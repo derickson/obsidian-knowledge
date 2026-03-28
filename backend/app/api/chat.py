@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import anthropic
 from fastapi import APIRouter
@@ -179,9 +181,16 @@ async def execute_tool(name: str, tool_input: dict) -> str:
     return json.dumps(result, default=str)
 
 
-def build_system_prompt(focused_note_path: str | None) -> str:
+def build_system_prompt(
+    focused_note_path: str | None, tz_name: str = "America/New_York"
+) -> str:
     """Build system prompt, optionally including focused note content."""
-    prompt = SYSTEM_INSTRUCTIONS
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz = ZoneInfo("America/New_York")
+    now = datetime.now(tz).strftime("%A, %Y-%m-%d %H:%M %Z")
+    prompt = f"Current date and time: {now}\n\n" + SYSTEM_INSTRUCTIONS
     if focused_note_path:
         try:
             note = read_note(focused_note_path)
@@ -206,6 +215,7 @@ class ChatRequest(BaseModel):
     messages: list[dict]
     model: str = "claude-haiku-4-5-20251001"
     focused_note_path: str | None = None
+    timezone: str = "America/New_York"
 
 
 @router.post("/")
@@ -215,7 +225,7 @@ async def chat(request: ChatRequest):
 
     async def event_stream():
         messages = request.messages
-        system_prompt = build_system_prompt(request.focused_note_path)
+        system_prompt = build_system_prompt(request.focused_note_path, request.timezone)
 
         while True:
             collected_content = []

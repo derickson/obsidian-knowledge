@@ -136,6 +136,7 @@ export default function App() {
           messages: apiMessages,
           model: chatModel,
           focused_note_path: selected?.path || null,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
 
@@ -511,12 +512,12 @@ export default function App() {
       {isMobile ? (
         // Mobile: single panel at a time
         <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {renderMobileNav()}
           <div style={{ flex: 1, overflow: "auto" }}>
             {mobileView === "list" && renderListPanel()}
             {mobileView === "detail" && renderDetailPanel()}
             {mobileView === "chat" && renderChatPanel()}
           </div>
-          {renderMobileNav()}
         </div>
       ) : (
         // Desktop: multi-column
@@ -633,7 +634,7 @@ const themes = {
     // Mobile navigation
     mobileNav: {
       display: "flex" as const,
-      borderTop: "1px solid #e0e0e0",
+      borderBottom: "1px solid #e0e0e0",
       background: "#fafafa",
     },
     mobileNavButton: {
@@ -648,7 +649,7 @@ const themes = {
     },
     mobileNavButtonActive: {
       color: "#7c3aed",
-      borderTop: "2px solid #7c3aed",
+      borderBottom: "2px solid #7c3aed",
     },
     // Shared
     listItem: {
@@ -831,7 +832,7 @@ const themes = {
     },
     mobileNav: {
       display: "flex" as const,
-      borderTop: "1px solid #2a2a4a",
+      borderBottom: "1px solid #2a2a4a",
       background: "#16162a",
     },
     mobileNavButton: {
@@ -846,7 +847,7 @@ const themes = {
     },
     mobileNavButtonActive: {
       color: "#a78bfa",
-      borderTop: "2px solid #a78bfa",
+      borderBottom: "2px solid #a78bfa",
     },
     listItem: {
       padding: "10px 16px",
