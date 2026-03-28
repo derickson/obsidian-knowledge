@@ -6,7 +6,7 @@ import pytest
 
 # Set env vars before any app imports
 os.environ.setdefault("VAULT_PATH", tempfile.mkdtemp())
-os.environ.setdefault("ES_CLOUD_ID", "")
+os.environ.setdefault("ES_URL", "")
 os.environ.setdefault("ES_API_KEY", "")
 os.environ.setdefault("HEADLESS_URL", "http://localhost:8100")
 

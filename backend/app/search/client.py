@@ -8,7 +8,7 @@ _es_client: Elasticsearch | None = None
 def get_es_client() -> Elasticsearch:
     global _es_client
     if _es_client is None:
-        _es_client = Elasticsearch(cloud_id=settings.es_cloud_id, api_key=settings.es_api_key)
+        _es_client = Elasticsearch(settings.es_url, api_key=settings.es_api_key)
     return _es_client
 
 

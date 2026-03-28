@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Elasticsearch
-    es_cloud_id: str = ""
+    # Elasticsearch Serverless
+    es_url: str = ""
     es_api_key: str = ""
     es_index: str = "obsidian-knowledge"
     es_inference_id: str = "jina-v3-small"
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # API
     api_prefix: str = "/obsidian-knowledge"
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()
