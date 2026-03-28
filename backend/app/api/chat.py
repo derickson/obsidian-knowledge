@@ -32,6 +32,13 @@ Notes are markdown files with YAML frontmatter for metadata and [[wikilinks]] fo
 - **Inbox/**: Staging area for unsorted or auto-ingested notes
 - **TestData/**: Reserved for automated tests — do not use
 
+## Daily notes
+
+- Daily notes live in `Observations/` with the naming pattern `YYYY-MM-DD-Daily.md` (e.g., `Observations/2026-03-28-Daily.md`).
+- They use the tags `daily` and `observation` in frontmatter.
+- A daily note captures the day's plans, reflections, and links to other vault entries (meetings, content, people).
+- When the user asks about "today", "yesterday", or a specific date without specifying a note, check the corresponding daily note first.
+
 ## Behavior
 
 - Use `semantic` search for natural language questions (hybrid BM25 + vector search).
