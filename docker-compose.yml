@@ -1,13 +1,28 @@
 services:
+  obsidian-headless:
+    build:
+      context: .
+      dockerfile: obsidian-headless/Dockerfile
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./vaults:/app/vaults
+    env_file:
+      - .env
+    restart: unless-stopped
+
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - ./vaults:/app/vaults
-      - ./backend/app:/app/app
+      - ./backend/app:/app/backend/app
     env_file:
       - .env
+    depends_on:
+      - obsidian-headless
     restart: unless-stopped
 
   frontend:

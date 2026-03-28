@@ -11,8 +11,11 @@ class Settings(BaseSettings):
     # Anthropic
     anthropic_api_key: str = ""
 
-    # Vault
-    vault_path: str = "/app/vaults/AgentKnowledge"
+    # Obsidian Headless service
+    headless_url: str = "http://obsidian-headless:8100"
+
+    # API
+    api_prefix: str = "/obsidian-knowledge"
 
     model_config = {"env_file": ".env"}
 

@@ -1,27 +1,11 @@
-import asyncio
-import logging
+import httpx
 
-logger = logging.getLogger(__name__)
+from app.config import settings
 
 
 async def run_ob_sync() -> dict:
-    """Run `ob sync` to sync vault with Obsidian cloud."""
-    proc = await asyncio.create_subprocess_exec(
-        "ob", "sync",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-
-    result = {
-        "returncode": proc.returncode,
-        "stdout": stdout.decode().strip(),
-        "stderr": stderr.decode().strip(),
-    }
-
-    if proc.returncode != 0:
-        logger.error("ob sync failed: %s", result["stderr"])
-    else:
-        logger.info("ob sync completed successfully")
-
-    return result
+    """Trigger ob sync via the headless service."""
+    async with httpx.AsyncClient(base_url=settings.headless_url, timeout=120) as client:
+        resp = await client.post("/sync/")
+        resp.raise_for_status()
+        return resp.json()

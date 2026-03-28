@@ -12,43 +12,57 @@ graph TD
         REST[REST Clients<br><i>External systems</i>]
     end
 
-    subgraph Backend["FastAPI + FastMCP"]
+    subgraph Backend["Backend · FastAPI + FastMCP · :8000"]
         API[REST API<br><i>/api/notes</i>]
         MCPS[MCP Server<br><i>/mcp</i>]
         Pipeline[Post-Processing Pipeline<br><i>index, sync, enrich</i>]
     end
 
+    subgraph Headless["Obsidian Headless · FastAPI · :8100"]
+        VaultAPI[Vault CRUD API]
+        Sync[ob sync]
+    end
+
     subgraph Storage
         Vault[(Obsidian Vault<br><i>source of truth</i>)]
         ES[(Elasticsearch<br><i>read-only mirror</i>)]
-        Cloud[Obsidian Cloud<br><i>via ob sync</i>]
+        Cloud[Obsidian Cloud]
     end
 
     MCP -->|SSE / HTTP| MCPS
     UI -->|HTTP| API
     REST -->|HTTP| API
 
-    API --> Vault
-    MCPS --> Vault
+    API -->|HTTP| VaultAPI
+    MCPS -->|HTTP| VaultAPI
     API --> ES
     MCPS --> ES
 
     API -->|background| Pipeline
     Pipeline -->|index| ES
-    Pipeline -->|ob sync| Cloud
+    Pipeline -->|HTTP| Sync
+
+    VaultAPI --> Vault
+    Sync <-->|ob sync| Cloud
+    Sync --> Vault
 
     Vault -->|one-way sync| ES
-    Vault <-->|ob sync| Cloud
 
     style Vault fill:#7c3aed,color:#fff
     style ES fill:#f59e0b,color:#fff
     style Cloud fill:#3b82f6,color:#fff
+    style Headless fill:#10b981,color:#fff
 ```
 
-- **Obsidian vault** (`vaults/AgentKnowledge/`) is the source of truth
-- **One-way sync**: vault → Elasticsearch. Writes never go to ES directly.
-- **`ob sync`** keeps the vault in sync with Obsidian cloud (headless, no desktop app)
-- **Post-processing pipeline** runs in background after note creation (indexing, sync, future cross-linking)
+### Services
+
+| Service | Port | Role |
+|---------|------|------|
+| **obsidian-headless** | 8100 | Owns the vault filesystem and `ob` CLI. FastAPI service for vault read/write/list/delete and sync. Only container that mounts `vaults/`. |
+| **backend** | 8000 | FastAPI + FastMCP. REST API + MCP server for external access. Calls headless for vault I/O, manages ES indexing and post-processing pipeline. |
+| **frontend** | 5173 | React/Vite search UI. |
+
+The backend never touches vault files directly — all vault I/O goes through the obsidian-headless service via HTTP.
 
 ## Prerequisites
 
@@ -89,31 +103,45 @@ cp .env.example .env
 ## Setup
 
 ```bash
-make build
-make up
+make init            # Install frontend npm deps + Python dev deps
 ```
 
-### Local development
+### Production (Docker Compose)
 
 ```bash
-# Install dependencies (Python 3.12, uv)
-uv sync --extra dev
+make build           # Build all containers
+make up              # Start all services
+make down            # Stop all services
+make redeploy        # down + build + up
+make logs            # Tail logs
+```
 
-# Run services
-make dev-backend     # Backend with hot reload (port 8000)
-make dev-frontend    # Frontend dev server (port 5173)
+### Local development (bare metal)
 
-# Test & lint
-make test
-make lint
+```bash
+make dev             # Start all 3 services with hot reload
+make dev-stop        # Stop all dev servers
+```
+
+Dev logs are written to `/tmp/ok-headless.log`, `/tmp/ok-backend.log`, `/tmp/ok-frontend.log`.
+
+### Testing
+
+```bash
+make test            # Run pytest
+make lint            # Run ruff
 ```
 
 The Python virtual environment lives at `~/.venvs/obsidian-knowledge` and is symlinked as `.venv` at the repo root.
 
+## URL Prefix
+
+All endpoints are served under a configurable prefix (default: `/obsidian-knowledge`) to support reverse proxy deployments. All paths end with `/` to avoid 301 redirects. Set `API_PREFIX` in `.env` to change the prefix.
+
 ## Ingest API
 
 ```bash
-curl -X POST http://localhost:8000/api/notes \
+curl -X POST http://localhost:8000/obsidian-knowledge/api/notes/ \
   -H "Content-Type: application/json" \
   -d '{
     "path": "Inbox/meeting-notes.md",
@@ -126,7 +154,7 @@ curl -X POST http://localhost:8000/api/notes \
 
 ## MCP
 
-The MCP server is mounted at `/mcp` and exposes tools for agentic access:
+The MCP server is mounted at `/obsidian-knowledge/mcp` and exposes tools for agentic access:
 
 - `search` — full-text search
 - `semantic` — semantic search via Jina embeddings
@@ -138,5 +166,6 @@ The MCP server is mounted at `/mcp` and exposes tools for agentic access:
 ## Tech Stack
 
 - **Backend**: Python 3.12, FastAPI, FastMCP, Elasticsearch, uv
+- **Obsidian Headless**: Python 3.12, FastAPI, Node.js (for `ob` CLI)
 - **Frontend**: React 19, Vite, TypeScript
 - **Infrastructure**: Docker Compose, Obsidian Headless (`ob sync`)

@@ -4,7 +4,7 @@ from elasticsearch.helpers import bulk
 
 from app.config import settings
 from app.search.client import es_client, ensure_index
-from app.vault.reader import list_notes, read_note, vault_path
+from app.vault.reader import list_notes, read_note
 
 
 def index_note(note: dict) -> None:
@@ -32,15 +32,13 @@ def reindex_all() -> dict:
     # Get current hashes from ES
     existing = _get_existing_hashes()
 
-    notes = list_notes()
-    base = vault_path()
+    note_paths = list_notes()
     indexed, skipped, deleted = 0, 0, 0
 
     actions = []
     seen_paths = set()
 
-    for note_path in notes:
-        rel_path = str(note_path.relative_to(base))
+    for rel_path in note_paths:
         seen_paths.add(rel_path)
 
         note = read_note(rel_path)

@@ -1,7 +1,12 @@
+from app.config import settings
+
+PREFIX = settings.api_prefix
+
+
 class TestCreateNote:
-    def test_create_note(self, client, vault_dir):
+    def test_create_note(self, client, mock_headless):
         resp = client.post(
-            "/api/notes",
+            f"{PREFIX}/api/notes/",
             json={
                 "path": "Inbox/new-note.md",
                 "content": "# New Note\n\nCreated via API.",
@@ -12,38 +17,40 @@ class TestCreateNote:
         data = resp.json()
         assert data["status"] == "created"
         assert data["path"] == "Inbox/new-note.md"
-        assert (vault_dir / "Inbox" / "new-note.md").exists()
+        mock_headless["write_note"].assert_called_once()
 
-    def test_create_note_minimal(self, client, vault_dir):
+    def test_create_note_minimal(self, client, mock_headless):
         resp = client.post(
-            "/api/notes",
+            f"{PREFIX}/api/notes/",
             json={"path": "bare.md", "content": "Just content"},
         )
         assert resp.status_code == 200
-        assert (vault_dir / "bare.md").exists()
+        mock_headless["write_note"].assert_called_once()
 
 
 class TestGetNote:
-    def test_get_existing_note(self, client, sample_note):
-        resp = client.get(f"/api/notes/{sample_note}")
+    def test_get_existing_note(self, client, mock_headless):
+        resp = client.get(f"{PREFIX}/api/notes/test-note.md")
         assert resp.status_code == 200
         data = resp.json()
         assert data["title"] == "Test Note"
         assert "testing" in data["tags"]
 
-    def test_get_missing_note_404(self, client):
-        resp = client.get("/api/notes/nonexistent.md")
+    def test_get_missing_note_404(self, client, mock_headless):
+        mock_headless["read_note"].side_effect = FileNotFoundError("not found")
+        resp = client.get(f"{PREFIX}/api/notes/nonexistent.md")
         assert resp.status_code == 404
 
 
 class TestDeleteNote:
-    def test_delete_existing(self, client, vault_dir, sample_note):
-        resp = client.delete(f"/api/notes/{sample_note}")
+    def test_delete_existing(self, client, mock_headless):
+        resp = client.delete(f"{PREFIX}/api/notes/test-note.md")
         assert resp.status_code == 200
-        assert not (vault_dir / sample_note).exists()
+        mock_headless["delete_note"].assert_called_once()
 
-    def test_delete_missing_404(self, client):
-        resp = client.delete("/api/notes/nonexistent.md")
+    def test_delete_missing_404(self, client, mock_headless):
+        mock_headless["read_note"].side_effect = FileNotFoundError("not found")
+        resp = client.delete(f"{PREFIX}/api/notes/nonexistent.md")
         assert resp.status_code == 404
 
 
@@ -60,7 +67,7 @@ class TestSearch:
             }
         }
 
-        resp = client.post("/api/notes/search", json={"query": "test"})
+        resp = client.post(f"{PREFIX}/api/notes/search/", json={"query": "test"})
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["results"]) == 1
@@ -78,6 +85,8 @@ class TestSearch:
             }
         }
 
-        resp = client.post("/api/notes/semantic-search", json={"query": "meaning"})
+        resp = client.post(
+            f"{PREFIX}/api/notes/semantic-search/", json={"query": "meaning"}
+        )
         assert resp.status_code == 200
         assert len(resp.json()["results"]) == 1

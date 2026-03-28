@@ -22,22 +22,36 @@ MCP Clients / Web UI / REST Clients
 - **One-way sync**: vault → ES. Writes never go to ES directly.
 - **Post-processing pipeline**: runs in background after note creation (indexing, ob sync, future cross-linking)
 
+### Service architecture (Docker)
+
+Three containers in docker-compose:
+
+- **obsidian-headless** (port 8100): Owns the vault filesystem and `ob` CLI. Runs a FastAPI service that exposes vault read/write/delete/list and sync operations over HTTP. Only container that mounts the `vaults/` volume.
+- **backend** (port 8000): FastAPI + FastMCP. REST API + MCP server. Calls obsidian-headless for vault operations, manages ES indexing, runs post-processing pipeline.
+- **frontend** (port 5173): React/Vite UI.
+
+The backend never touches vault files directly — all vault I/O goes through the obsidian-headless service via HTTP.
+
 ## Commands
 
 ```bash
-# Docker
+# Setup
+make init            # Install frontend deps + Python dev deps
+
+# Docker (production)
 make up              # Start all services
 make down            # Stop all services
 make build           # Rebuild containers
+make redeploy        # down + build + up
 make logs            # Tail logs
 
-# Local development
-make dev-backend     # Run backend with hot reload (port 8000)
-make dev-frontend    # Run frontend dev server (port 5173)
+# Local development (bare metal)
+make dev             # Start all 3 services with hot reload
+make dev-stop        # Stop all dev servers
 
 # Obsidian
 ob sync              # Sync vault with Obsidian cloud
-make sync            # Same as above
+make sync            # Trigger sync via headless service
 
 # Testing & linting
 make test            # Run pytest
@@ -66,17 +80,31 @@ make reindex         # Full reindex vault → ES
 | `backend/app/api/notes.py` | REST endpoints: CRUD + search |
 | `backend/app/api/admin.py` | Reindex and sync triggers |
 | `backend/app/mcp/tools.py` | MCP tool definitions (search, read, create, reindex) |
-| `backend/app/vault/reader.py` | Read/parse vault markdown files, extract wikilinks |
-| `backend/app/vault/writer.py` | Write notes with frontmatter to vault |
+| `backend/app/vault/reader.py` | HTTP client to headless service (read/list notes) |
+| `backend/app/vault/writer.py` | HTTP client to headless service (write/delete notes) |
 | `backend/app/search/client.py` | ES client (lazy init), index mapping, search/semantic queries |
 | `backend/app/search/indexer.py` | Vault → ES sync with content-hash change detection |
 | `backend/app/pipeline/runner.py` | Background post-processing (index + sync + future enrichment) |
-| `backend/app/sync.py` | `ob sync` subprocess wrapper |
+| `backend/app/sync.py` | HTTP client to headless service (trigger `ob sync`) |
+
+## Obsidian Headless Service
+
+| Module | Purpose |
+|--------|---------|
+| `obsidian-headless/app/main.py` | FastAPI endpoints for vault CRUD + sync |
+| `obsidian-headless/app/config.py` | pydantic-settings (`VAULT_PATH`) |
+| `obsidian-headless/app/vault/reader.py` | Direct file I/O: read/parse vault markdown, extract wikilinks |
+| `obsidian-headless/app/vault/writer.py` | Direct file I/O: write notes with frontmatter |
+| `obsidian-headless/app/sync.py` | `ob sync` subprocess wrapper |
+
+### URL conventions
+
+All backend endpoints are prefixed with a configurable `API_PREFIX` (default: `/obsidian-knowledge`, set in `.env`). All endpoints end with `/` to avoid 301 redirects behind a reverse proxy.
 
 ### Ingest API
 
 ```
-POST /api/notes
+POST /obsidian-knowledge/api/notes/
 {
   "path": "Inbox/note-title.md",
   "content": "# Markdown content here",
@@ -89,7 +117,7 @@ POST /api/notes
 ## Frontend (React/TypeScript)
 
 - Vite + React 19 + TypeScript
-- Proxies `/api` to backend in dev mode
+- Proxies `API_PREFIX` to backend in dev mode
 - Minimal search UI (full-text and semantic modes)
 
 ## Working with Obsidian Vaults

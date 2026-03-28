@@ -2,7 +2,7 @@ from fastmcp import FastMCP
 
 from app.search.client import search_notes, semantic_search
 from app.search.indexer import index_note, reindex_all
-from app.vault.reader import read_note, list_notes, vault_path
+from app.vault.reader import read_note, list_notes
 from app.vault.writer import write_note
 
 mcp = FastMCP("Obsidian Knowledge")
@@ -29,8 +29,7 @@ def read(path: str) -> dict:
 @mcp.tool()
 def list_all_notes(folder: str | None = None) -> list[str]:
     """List all notes in the vault, optionally filtered by folder."""
-    base = vault_path()
-    return [str(p.relative_to(base)) for p in list_notes(folder)]
+    return list_notes(folder)
 
 
 @mcp.tool()

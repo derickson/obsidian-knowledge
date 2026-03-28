@@ -1,5 +1,8 @@
 import { useState } from "react";
 
+declare const __API_PREFIX__: string;
+const API = `${__API_PREFIX__}/api/notes`;
+
 interface SearchResult {
   path: string;
   title: string;
@@ -15,7 +18,7 @@ export default function App() {
   const handleSearch = async () => {
     if (!query.trim()) return;
     const endpoint =
-      mode === "semantic" ? "/api/notes/semantic-search" : "/api/notes/search";
+      mode === "semantic" ? `${API}/semantic-search/` : `${API}/search/`;
     const resp = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

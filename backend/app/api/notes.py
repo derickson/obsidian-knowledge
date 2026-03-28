@@ -20,7 +20,7 @@ class SearchQuery(BaseModel):
     size: int = 10
 
 
-@router.post("")
+@router.post("/")
 async def create_note(note: NoteCreate, background_tasks: BackgroundTasks):
     """Create or update a note. Indexes to ES and syncs in the background."""
     write_note(note.path, note.content, note.metadata)
@@ -48,13 +48,13 @@ async def remove_note(path: str):
     return {"status": "deleted", "path": path}
 
 
-@router.post("/search")
+@router.post("/search/")
 async def search(query: SearchQuery):
     """Full-text search across indexed notes."""
     return {"results": search_notes(query.query, query.size)}
 
 
-@router.post("/semantic-search")
+@router.post("/semantic-search/")
 async def semantic(query: SearchQuery):
     """Semantic search using Jina embeddings."""
     return {"results": semantic_search(query.query, query.size)}

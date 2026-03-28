@@ -10,9 +10,11 @@ dependencies = [
     "elasticsearch>=8.17",
     "python-frontmatter>=1.1",
     "anthropic>=0.52",
+    "httpx>=0.28",
     "watchfiles>=1.0",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
+    "elastic-apm>=6.23",
 ]
 
 [project.optional-dependencies]

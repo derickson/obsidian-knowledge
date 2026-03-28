@@ -1,7 +1,18 @@
+"""Tests for the obsidian-headless sync subprocess wrapper."""
+
 import asyncio
+import importlib.util
+import sys
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from app.sync import run_ob_sync
+# Load obsidian-headless sync module directly to avoid app namespace collision
+_headless_root = Path(__file__).resolve().parent.parent / "obsidian-headless"
+_spec = importlib.util.spec_from_file_location("headless_sync", _headless_root / "app/sync.py")
+_sync_mod = importlib.util.module_from_spec(_spec)
+sys.modules["headless_sync"] = _sync_mod
+_spec.loader.exec_module(_sync_mod)
+run_ob_sync = _sync_mod.run_ob_sync
 
 
 class TestObSync:
