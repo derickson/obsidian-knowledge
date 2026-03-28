@@ -68,6 +68,7 @@ export default function App() {
   const [chatStreaming, setChatStreaming] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
   const isMobile = useIsMobile();
 
@@ -225,6 +226,7 @@ export default function App() {
 
     setChatStreaming(false);
     setActiveTool(null);
+    setTimeout(() => chatInputRef.current?.focus(), 0);
   };
 
   const noteExists = (target: string): boolean => {
@@ -493,6 +495,7 @@ export default function App() {
       </div>
       <div style={theme.chatInputArea}>
         <textarea
+          ref={chatInputRef}
           value={chatInput}
           onChange={(e) => {
             setChatInput(e.target.value);
