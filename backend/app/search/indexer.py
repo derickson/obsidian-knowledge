@@ -7,6 +7,11 @@ from app.search.client import es_client, ensure_index
 from app.vault.reader import list_notes, read_note
 
 
+def delete_from_index(path: str) -> None:
+    """Delete a single note from the Elasticsearch index."""
+    es_client.delete(index=settings.es_index, id=path, ignore=[404])
+
+
 def index_note(note: dict) -> None:
     """Index a single note into Elasticsearch."""
     ensure_index()

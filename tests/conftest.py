@@ -71,6 +71,8 @@ def mock_headless(monkeypatch):
         except AttributeError:
             pass
 
+    mock_delete_index = MagicMock()
+
     for mod in ["app.vault.writer", "app.api.notes"]:
         try:
             monkeypatch.setattr(f"{mod}.write_note", mock_write)
@@ -78,6 +80,12 @@ def mock_headless(monkeypatch):
             pass
         try:
             monkeypatch.setattr(f"{mod}.delete_note", mock_delete)
+        except AttributeError:
+            pass
+
+    for mod in ["app.search.indexer", "app.api.notes"]:
+        try:
+            monkeypatch.setattr(f"{mod}.delete_from_index", mock_delete_index)
         except AttributeError:
             pass
 
@@ -92,6 +100,7 @@ def mock_headless(monkeypatch):
         "list_notes": mock_list,
         "write_note": mock_write,
         "delete_note": mock_delete,
+        "delete_from_index": mock_delete_index,
         "run_ob_sync": mock_sync,
     }
 

@@ -60,6 +60,16 @@ def _check_services(backend, headless):
         pytest.skip("Headless service not running (start with `make dev`)")
 
 
+@pytest.fixture(scope="module", autouse=True)
+def cleanup_test_note(backend):
+    """Ensure test note is deleted even if tests fail mid-way."""
+    yield
+    try:
+        backend.delete(f"{API_PREFIX}/api/notes/{NOTE_PATH}")
+    except Exception:
+        pass
+
+
 @pytest.mark.integration
 class TestNoteLifecycle:
     """End-to-end test: create → wait for indexing → search → read → delete."""
@@ -145,6 +155,19 @@ class TestNoteLifecycle:
         assert resp.json()["status"] == "deleted"
 
     def test_10_verify_deleted(self, backend):
-        """Confirm the note is gone."""
+        """Confirm the note is gone from the vault."""
         resp = backend.get(f"{API_PREFIX}/api/notes/{NOTE_PATH}")
         assert resp.status_code == 404
+
+    def test_11_verify_deleted_from_es(self, backend):
+        """Confirm the note is gone from Elasticsearch."""
+        time.sleep(3)  # Wait for ES to reflect the deletion
+        resp = backend.post(
+            f"{API_PREFIX}/api/notes/search/",
+            json={"query": UNIQUE_KEYWORD, "size": 5},
+        )
+        if resp.status_code == 500:
+            pytest.skip("Elasticsearch not configured")
+        results = resp.json()["results"]
+        paths = [r["path"] for r in results]
+        assert NOTE_PATH not in paths, f"Note still in ES after deletion: {paths}"

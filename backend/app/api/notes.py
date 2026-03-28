@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 from app.pipeline.runner import process_note
 from app.search.client import search_notes, semantic_search
+from app.search.indexer import delete_from_index
 from app.vault.reader import read_note
 from app.vault.writer import write_note, delete_note
 
@@ -45,6 +46,7 @@ async def remove_note(path: str):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Note not found: {path}")
     delete_note(path)
+    delete_from_index(path)
     return {"status": "deleted", "path": path}
 
 
