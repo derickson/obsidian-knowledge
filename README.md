@@ -54,24 +54,30 @@ graph TD
 
 ### Obsidian Headless
 
-Install the [Obsidian CLI](https://obsidian.md/cli) (`ob`), then log in and set up vault sync:
+Requires an [Obsidian Sync](https://obsidian.md/sync) subscription. Install the headless client and set up vault sync per the [official docs](https://obsidian.md/help/sync/headless):
 
 ```bash
+# Install the headless client
+npm install -g obsidian-headless
+
 # Log in to your Obsidian account
 ob login
 
-# Create a remote vault (first time only) or list existing ones
-ob sync-create-remote --name AgentKnowledge
+# Create a remote vault (first time only), or list existing ones
+ob sync-create-remote --name "AgentKnowledge"
 # or: ob sync-list-remote
 
 # Link the local vault directory to the remote vault
-ob sync-setup --path vaults/AgentKnowledge --remote-vault AgentKnowledge
+ob sync-setup --vault AgentKnowledge --path vaults/AgentKnowledge
 
 # Pull down existing notes (or confirm sync is working)
 ob sync --path vaults/AgentKnowledge
+
+# Check sync status
+ob sync-status --path vaults/AgentKnowledge
 ```
 
-After setup, `ob sync` will push and pull changes between this server and Obsidian cloud.
+After setup, `ob sync` will push and pull changes between this server and Obsidian cloud. The backend triggers `ob sync` automatically after note creation via the API.
 
 ### Environment
 
