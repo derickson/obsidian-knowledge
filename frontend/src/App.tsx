@@ -564,11 +564,9 @@ export default function App() {
         // Mobile: single panel at a time
         <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           {renderMobileNav()}
-          <div style={{ flex: 1, overflow: "auto" }}>
-            {mobileView === "list" && renderListPanel()}
-            {mobileView === "detail" && renderDetailPanel()}
-            {mobileView === "chat" && renderChatPanel()}
-          </div>
+          {mobileView === "list" && <div style={{ flex: 1, overflow: "auto" }}>{renderListPanel()}</div>}
+          {mobileView === "detail" && <div style={{ flex: 1, overflow: "auto" }}>{renderDetailPanel()}</div>}
+          {mobileView === "chat" && renderChatPanel()}
         </div>
       ) : (
         // Desktop: multi-column
