@@ -25,6 +25,12 @@ SAMPLE_NOTE = {
 
 SAMPLE_NOTES_LIST = ["note-a.md", "Inbox/note-b.md", "Inbox/note-c.md"]
 
+SAMPLE_MANIFEST = [
+    {"path": "note-a.md", "last_modified": 1700000000},
+    {"path": "Inbox/note-b.md", "last_modified": 1700000000},
+    {"path": "Inbox/note-c.md", "last_modified": 1700000000},
+]
+
 
 @pytest.fixture(autouse=True)
 def vault_dir(tmp_path):
@@ -48,6 +54,7 @@ def mock_headless(monkeypatch):
     """Mock the headless HTTP client calls everywhere they're used."""
     mock_read = MagicMock(return_value=SAMPLE_NOTE)
     mock_list = MagicMock(return_value=SAMPLE_NOTES_LIST)
+    mock_manifest = MagicMock(return_value=SAMPLE_MANIFEST)
     mock_write = MagicMock(return_value=SAMPLE_NOTE)
     mock_delete = MagicMock()
     mock_sync = MagicMock(
@@ -68,6 +75,10 @@ def mock_headless(monkeypatch):
             pass
         try:
             monkeypatch.setattr(f"{mod}.list_notes", mock_list)
+        except AttributeError:
+            pass
+        try:
+            monkeypatch.setattr(f"{mod}.list_manifest", mock_manifest)
         except AttributeError:
             pass
 
@@ -98,6 +109,7 @@ def mock_headless(monkeypatch):
     return {
         "read_note": mock_read,
         "list_notes": mock_list,
+        "list_manifest": mock_manifest,
         "write_note": mock_write,
         "delete_note": mock_delete,
         "delete_from_index": mock_delete_index,

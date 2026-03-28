@@ -25,6 +25,17 @@ async def api_list_notes(folder: str | None = None):
     return {"notes": [str(p.relative_to(base)) for p in list_notes(folder)]}
 
 
+@app.get("/notes/manifest/")
+async def api_manifest():
+    """Return path and mtime for all notes (lightweight, no content reading)."""
+    base = vault_path()
+    manifest = []
+    for p in list_notes():
+        rel = str(p.relative_to(base))
+        manifest.append({"path": rel, "last_modified": int(p.stat().st_mtime)})
+    return {"notes": manifest}
+
+
 @app.get("/notes/{path:path}")
 async def api_read_note(path: str):
     """Read a note from the vault."""

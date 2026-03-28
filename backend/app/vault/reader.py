@@ -16,6 +16,14 @@ def list_notes(folder: str | None = None) -> list[str]:
         return resp.json()["notes"]
 
 
+def list_manifest() -> list[dict]:
+    """Get path + mtime for all notes (lightweight, no content reading)."""
+    with _client() as client:
+        resp = client.get("/notes/manifest/")
+        resp.raise_for_status()
+        return resp.json()["notes"]
+
+
 def read_note(path: str) -> dict:
     """Read a note via headless service."""
     with _client() as client:

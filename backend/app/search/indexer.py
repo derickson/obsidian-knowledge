@@ -4,7 +4,7 @@ from elasticsearch.helpers import bulk
 
 from app.config import settings
 from app.search.client import es_client, ensure_index
-from app.vault.reader import list_notes, read_note
+from app.vault.reader import list_manifest, read_note
 
 
 def delete_from_index(path: str) -> None:
@@ -31,25 +31,36 @@ def index_note(note: dict) -> None:
 
 
 def reindex_all() -> dict:
-    """Full reindex: sync all vault notes to Elasticsearch."""
+    """Incremental reindex: only read and index notes that have changed.
+
+    Uses file mtime from the vault manifest to skip unchanged files.
+    Only files whose mtime differs from ES last_modified are fully read
+    and content-hashed. This avoids N HTTP reads on every sync.
+    """
     ensure_index()
 
-    # Get current hashes from ES
-    existing = _get_existing_hashes()
+    existing = _get_existing_state()
+    manifest = list_manifest()
 
-    note_paths = list_notes()
     indexed, skipped, deleted = 0, 0, 0
-
     actions = []
     seen_paths = set()
 
-    for rel_path in note_paths:
+    for entry in manifest:
+        rel_path = entry["path"]
+        vault_mtime = entry["last_modified"]
         seen_paths.add(rel_path)
 
+        # Skip if mtime hasn't changed — file is untouched
+        if rel_path in existing and existing[rel_path]["last_modified"] == vault_mtime:
+            skipped += 1
+            continue
+
+        # mtime changed or new file — read full content and check hash
         note = read_note(rel_path)
 
-        # Skip if content unchanged
-        if rel_path in existing and existing[rel_path] == note["content_hash"]:
+        if rel_path in existing and existing[rel_path]["content_hash"] == note["content_hash"]:
+            # mtime changed but content identical (e.g., touch or metadata-only change)
             skipped += 1
             continue
 
@@ -74,7 +85,7 @@ def reindex_all() -> dict:
     if actions:
         bulk(es_client, actions)
 
-    # Delete docs for notes that no longer exist
+    # Delete docs for notes that no longer exist in the vault
     for path in existing:
         if path not in seen_paths:
             es_client.delete(index=settings.es_index, id=path, ignore=[404])
@@ -83,18 +94,22 @@ def reindex_all() -> dict:
     return {"indexed": indexed, "skipped": skipped, "deleted": deleted}
 
 
-def _get_existing_hashes() -> dict[str, str]:
-    """Get path -> content_hash mapping from ES for change detection."""
-    hashes = {}
+def _get_existing_state() -> dict[str, dict]:
+    """Get path -> {content_hash, last_modified} from ES for change detection."""
+    state = {}
     try:
         resp = es_client.search(
             index=settings.es_index,
             query={"match_all": {}},
-            _source=["path", "content_hash"],
+            _source=["path", "content_hash", "last_modified"],
             size=10000,
         )
         for hit in resp["hits"]["hits"]:
-            hashes[hit["_source"]["path"]] = hit["_source"]["content_hash"]
+            src = hit["_source"]
+            state[src["path"]] = {
+                "content_hash": src["content_hash"],
+                "last_modified": src.get("last_modified", 0),
+            }
     except Exception:
         pass
-    return hashes
+    return state
