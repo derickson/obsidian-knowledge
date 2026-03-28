@@ -12,13 +12,13 @@ graph TD
         REST[REST Clients<br><i>External systems</i>]
     end
 
-    subgraph Backend["Backend · FastAPI + FastMCP · :8000"]
-        API[REST API<br><i>/api/notes</i>]
-        MCPS[MCP Server<br><i>/mcp</i>]
+    subgraph Backend["Backend · FastAPI + FastMCP · :3105 / :8000"]
+        API[REST API<br><i>/obsidian-knowledge/api/</i>]
+        MCPS[MCP Server<br><i>/obsidian-knowledge/mcp/</i>]
         Pipeline[Post-Processing Pipeline<br><i>index, sync, enrich</i>]
     end
 
-    subgraph Headless["Obsidian Headless · FastAPI · :8100"]
+    subgraph Headless["Obsidian Headless · FastAPI · :3104 / :8100"]
         VaultAPI[Vault CRUD API]
         Sync[ob sync]
     end
@@ -97,7 +97,7 @@ After setup, `ob sync` will push and pull changes between this server and Obsidi
 
 ```bash
 cp .env.example .env
-# Fill in ES_CLOUD_ID, ES_API_KEY, ANTHROPIC_API_KEY
+# Fill in ES_URL, ES_API_KEY, ANTHROPIC_API_KEY, ELASTIC_APM_* values
 ```
 
 ## Setup
@@ -141,7 +141,8 @@ All endpoints are served under a configurable prefix (default: `/obsidian-knowle
 ## Ingest API
 
 ```bash
-curl -X POST http://localhost:8000/obsidian-knowledge/api/notes/ \
+# Dev port 3105, Docker port 8000
+curl -X POST http://localhost:3105/obsidian-knowledge/api/notes/ \
   -H "Content-Type: application/json" \
   -d '{
     "path": "Inbox/meeting-notes.md",
@@ -154,7 +155,7 @@ curl -X POST http://localhost:8000/obsidian-knowledge/api/notes/ \
 
 ## MCP
 
-The MCP server is mounted at `/obsidian-knowledge/mcp` and exposes tools for agentic access:
+The MCP server is mounted at `/obsidian-knowledge/mcp/` and exposes tools for agentic access:
 
 - `search` — full-text search
 - `semantic` — semantic search via Jina embeddings
