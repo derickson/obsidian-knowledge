@@ -51,6 +51,18 @@ def ensure_index():
     )
 
 
+def recent_notes(size: int = 20) -> list[dict]:
+    """Return the most recently modified notes."""
+    client = get_es_client()
+    resp = client.search(
+        index=settings.es_index,
+        query={"match_all": {}},
+        sort=[{"last_modified": {"order": "desc"}}],
+        size=size,
+    )
+    return [hit["_source"] for hit in resp["hits"]["hits"]]
+
+
 def search_notes(query: str, size: int = 10) -> list[dict]:
     """Full-text search across notes."""
     client = get_es_client()
