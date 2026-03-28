@@ -60,6 +60,7 @@ export default function App() {
 
   const [existingNotes, setExistingNotes] = useState<Set<string>>(new Set());
 
+  const [showInfo, setShowInfo] = useState(false);
   const [chatOpen, setChatOpen] = useState(window.innerWidth >= 768);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -563,6 +564,9 @@ export default function App() {
           <button onClick={handleToday} style={theme.headerButton}>
             Today
           </button>
+          <button onClick={() => setShowInfo(true)} style={theme.headerButton}>
+            Info
+          </button>
           {!isMobile && (
             <button
               onClick={() => setChatOpen(!chatOpen)}
@@ -621,6 +625,56 @@ export default function App() {
           {renderListPanel()}
           {renderDetailPanel()}
           {chatOpen && renderChatPanel()}
+        </div>
+      )}
+
+      {/* Info modal */}
+      {showInfo && (
+        <div
+          style={theme.modalOverlay}
+          onClick={() => setShowInfo(false)}
+        >
+          <div
+            style={theme.modal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Connection Info</h2>
+              <button onClick={() => setShowInfo(false)} style={theme.headerButton}>Close</button>
+            </div>
+            <div style={{ fontSize: 14, lineHeight: 1.8 }}>
+              <h3 style={{ marginTop: 0 }}>MCP Server</h3>
+              <p>This knowledge base exposes an MCP (Model Context Protocol) server for agentic access.</p>
+              <p><strong>Endpoint:</strong></p>
+              <code style={theme.codeBlock}>{window.location.origin}{__API_PREFIX__}/mcp/</code>
+
+              <h3>Authentication</h3>
+              <p>The MCP endpoint requires a Bearer token. Include it in requests as:</p>
+              <code style={theme.codeBlock}>Authorization: Bearer &lt;MCP_API_KEY&gt;</code>
+              <p style={{ fontSize: 12, opacity: 0.6 }}>Set <code>MCP_API_KEY</code> in the server's <code>.env</code> file.</p>
+
+              <h3>Claude Desktop</h3>
+              <p>Add via <strong>Settings &gt; Connectors</strong> with the endpoint URL and Bearer token.</p>
+
+              <h3>Claude Code</h3>
+              <code style={theme.codeBlock}>{`claude mcp add obsidian-knowledge --transport http ${window.location.origin}${__API_PREFIX__}/mcp/ --header "Authorization: Bearer <MCP_API_KEY>"`}</code>
+
+              <h3>Available Tools</h3>
+              <ul style={{ paddingLeft: 20 }}>
+                <li><strong>search</strong> — full-text BM25 search</li>
+                <li><strong>semantic</strong> — hybrid search (BM25 + vector)</li>
+                <li><strong>read</strong> — read a note by path</li>
+                <li><strong>list_all_notes</strong> — list notes by folder</li>
+                <li><strong>create</strong> — create or update a note</li>
+                <li><strong>delete</strong> — delete a note</li>
+                <li><strong>reindex</strong> — resync vault to Elasticsearch</li>
+              </ul>
+
+              <h3>REST API</h3>
+              <code style={theme.codeBlock}>{window.location.origin}{__API_PREFIX__}/api/notes/</code>
+              <p style={{ fontSize: 12, opacity: 0.6 }}>Protected by HTTP Basic Auth when accessed through nginx.</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -847,6 +901,38 @@ const themes = {
       lineHeight: 1.4,
       fontFamily: "inherit",
     },
+    modalOverlay: {
+      position: "fixed" as const,
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: "rgba(0,0,0,0.4)",
+      display: "flex" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      zIndex: 1000,
+    },
+    modal: {
+      background: "#fff",
+      color: "#1a1a1a",
+      borderRadius: 12,
+      padding: "24px",
+      maxWidth: 560,
+      width: "90%",
+      maxHeight: "80vh",
+      overflowY: "auto" as const,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+    },
+    codeBlock: {
+      display: "block" as const,
+      background: "#f3f4f6",
+      border: "1px solid #e5e7eb",
+      borderRadius: 6,
+      padding: "8px 12px",
+      fontSize: 12,
+      fontFamily: "monospace",
+      overflowX: "auto" as const,
+      marginBottom: 8,
+      wordBreak: "break-all" as const,
+    },
   },
   dark: {
     root: { ...shared, background: "#1a1a2e", color: "#e0e0e0" },
@@ -1057,6 +1143,39 @@ const themes = {
       overflow: "hidden",
       lineHeight: 1.4,
       fontFamily: "inherit",
+    },
+    modalOverlay: {
+      position: "fixed" as const,
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: "rgba(0,0,0,0.6)",
+      display: "flex" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      zIndex: 1000,
+    },
+    modal: {
+      background: "#1a1a2e",
+      color: "#e0e0e0",
+      borderRadius: 12,
+      padding: "24px",
+      maxWidth: 560,
+      width: "90%",
+      maxHeight: "80vh",
+      overflowY: "auto" as const,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      border: "1px solid #2a2a4a",
+    },
+    codeBlock: {
+      display: "block" as const,
+      background: "#1e1e3a",
+      border: "1px solid #2a2a4a",
+      borderRadius: 6,
+      padding: "8px 12px",
+      fontSize: 12,
+      fontFamily: "monospace",
+      overflowX: "auto" as const,
+      marginBottom: 8,
+      wordBreak: "break-all" as const,
     },
   },
 };
