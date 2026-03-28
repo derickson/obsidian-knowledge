@@ -181,38 +181,18 @@ The MCP server is mounted at `/obsidian-knowledge/mcp/` and exposes tools for ag
 
 ### Connecting from Claude Desktop
 
-Add this to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+Claude Desktop requires remote MCP servers to be configured via the UI, not `claude_desktop_config.json`:
 
-```json
-{
-  "mcpServers": {
-    "obsidian-knowledge": {
-      "type": "streamable-http",
-      "url": "http://localhost:3105/obsidian-knowledge/mcp/"
-    }
-  }
-}
-```
+1. Open Claude Desktop **Settings > Connectors**
+2. Add a new connector with the URL:
+   ```
+   http://your-server:3105/obsidian-knowledge/mcp/
+   ```
 
 ### Connecting from Claude Code
 
-Add the MCP server to your project or global settings:
-
 ```bash
-claude mcp add obsidian-knowledge --transport http http://localhost:3105/obsidian-knowledge/mcp/
-```
-
-Or add it manually to `.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "obsidian-knowledge": {
-      "type": "streamable-http",
-      "url": "http://localhost:3105/obsidian-knowledge/mcp/"
-    }
-  }
-}
+claude mcp add obsidian-knowledge --transport http http://your-server:3105/obsidian-knowledge/mcp/
 ```
 
 ### Connecting from other MCP clients
@@ -220,10 +200,10 @@ Or add it manually to `.claude/settings.json`:
 Any MCP client that supports Streamable HTTP transport can connect to:
 
 ```
-http://localhost:3105/obsidian-knowledge/mcp/
+http://your-server:3105/obsidian-knowledge/mcp/
 ```
 
-Replace `localhost:3105` with your server's hostname/IP if connecting remotely.
+Replace `your-server` with your server's hostname or IP.
 
 ## Tech Stack
 
