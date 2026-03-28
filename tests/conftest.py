@@ -9,6 +9,7 @@ os.environ.setdefault("VAULT_PATH", tempfile.mkdtemp())
 os.environ.setdefault("ES_URL", "")
 os.environ.setdefault("ES_API_KEY", "")
 os.environ.setdefault("HEADLESS_URL", "http://localhost:8100")
+os.environ.setdefault("MCP_API_KEY", "")
 
 
 SAMPLE_NOTE = {

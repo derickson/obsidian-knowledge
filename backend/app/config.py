@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # API
     api_prefix: str = "/obsidian-knowledge"
 
+    # MCP authentication
+    mcp_api_key: str = ""
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

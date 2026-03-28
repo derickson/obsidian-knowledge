@@ -1,11 +1,22 @@
 from fastmcp import FastMCP
 
+from app.config import settings
 from app.search.client import search_notes, semantic_search
 from app.search.indexer import index_note, reindex_all
 from app.vault.reader import read_note, list_notes
 from app.vault.writer import write_note
 
-mcp = FastMCP("Obsidian Knowledge")
+mcp_auth = None
+if settings.mcp_api_key:
+    from fastmcp.server.auth import DebugTokenVerifier
+
+    mcp_auth = DebugTokenVerifier(
+        validate=lambda token: token == settings.mcp_api_key,
+        client_id="mcp-client",
+        scopes=[],
+    )
+
+mcp = FastMCP("Obsidian Knowledge", auth=mcp_auth)
 
 
 @mcp.tool()

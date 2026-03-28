@@ -179,20 +179,22 @@ The MCP server is mounted at `/obsidian-knowledge/mcp/` and exposes tools for ag
 - `list_all_notes` — list notes, optionally by folder
 - `reindex` — full vault → ES resync
 
+### Authentication
+
+The MCP endpoint is protected with Bearer token authentication. Set `MCP_API_KEY` in `.env` to enable it. When set, clients must send `Authorization: Bearer <key>` with each request. When unset, the MCP endpoint is open (useful for local dev).
+
 ### Connecting from Claude Desktop
 
-Claude Desktop requires remote MCP servers to be configured via the UI, not `claude_desktop_config.json`:
-
-1. Open Claude Desktop **Settings > Connectors**
-2. Add a new connector with the URL:
-   ```
-   http://your-server:3105/obsidian-knowledge/mcp/
-   ```
+Configure via **Settings > Connectors**:
+- URL: `http://your-server:1071/obsidian-knowledge/mcp/`
+- Auth: Bearer token with your `MCP_API_KEY` value
 
 ### Connecting from Claude Code
 
 ```bash
-claude mcp add obsidian-knowledge --transport http http://your-server:3105/obsidian-knowledge/mcp/
+claude mcp add obsidian-knowledge --transport http \
+  http://your-server:1071/obsidian-knowledge/mcp/ \
+  --header "Authorization: Bearer your-mcp-api-key"
 ```
 
 ### Connecting from other MCP clients
@@ -200,10 +202,10 @@ claude mcp add obsidian-knowledge --transport http http://your-server:3105/obsid
 Any MCP client that supports Streamable HTTP transport can connect to:
 
 ```
-http://your-server:3105/obsidian-knowledge/mcp/
+http://your-server:1071/obsidian-knowledge/mcp/
 ```
 
-Replace `your-server` with your server's hostname or IP.
+Send `Authorization: Bearer <MCP_API_KEY>` in the request headers. Replace `your-server` with your server's hostname or IP. Use port 3105 for direct access without nginx.
 
 ## Tech Stack
 
