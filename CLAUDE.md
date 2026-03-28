@@ -81,13 +81,14 @@ make reindex         # Full reindex vault → ES
 |--------|---------|
 | `backend/app/main.py` | FastAPI app setup, mounts MCP at `/mcp` |
 | `backend/app/config.py` | pydantic-settings, reads from `.env` |
-| `backend/app/api/notes.py` | REST endpoints: CRUD + search |
+| `backend/app/api/notes.py` | REST endpoints: CRUD + search + recent + list |
 | `backend/app/api/admin.py` | Reindex and sync triggers |
-| `backend/app/mcp/tools.py` | MCP tool definitions (search, read, create, reindex) |
+| `backend/app/api/chat.py` | Streaming chat endpoint with Anthropic tool use |
+| `backend/app/mcp/tools.py` | MCP tool definitions (search, read, create, delete, reindex) |
 | `backend/app/vault/reader.py` | HTTP client to headless service (read/list notes) |
 | `backend/app/vault/writer.py` | HTTP client to headless service (write/delete notes) |
 | `backend/app/search/client.py` | ES client (lazy init), index mapping, search/semantic queries |
-| `backend/app/search/indexer.py` | Vault → ES sync with content-hash change detection |
+| `backend/app/search/indexer.py` | Vault → ES sync with mtime-based change detection |
 | `backend/app/pipeline/runner.py` | Background post-processing (index + sync + future enrichment) |
 | `backend/app/sync.py` | HTTP client to headless service (trigger `ob sync`) |
 
@@ -95,7 +96,7 @@ make reindex         # Full reindex vault → ES
 
 | Module | Purpose |
 |--------|---------|
-| `obsidian-headless/app/main.py` | FastAPI endpoints for vault CRUD + sync |
+| `obsidian-headless/app/main.py` | FastAPI endpoints for vault CRUD + sync + manifest |
 | `obsidian-headless/app/config.py` | pydantic-settings (`VAULT_PATH`) |
 | `obsidian-headless/app/vault/reader.py` | Direct file I/O: read/parse vault markdown, extract wikilinks |
 | `obsidian-headless/app/vault/writer.py` | Direct file I/O: write notes with frontmatter |
@@ -124,11 +125,14 @@ POST /obsidian-knowledge/api/notes/
 - Served under `API_PREFIX` (default `/obsidian-knowledge/`)
 - **Dev**: Vite dev server on port 8104 with HMR, proxies API/MCP to backend
 - **Production**: `make build-frontend` builds static files to `frontend/dist/`, served by nginx directly
-- Search UI with full-text and hybrid semantic modes (defaults to semantic)
+- **Layout**: Three-column on desktop (note list + detail + chat), single-panel with tab nav on mobile
+- **Features**: Semantic search, rendered markdown with clickable [[wikilinks]], dead link detection, Today button for daily notes, built-in Claude chatbot with tool use
+- **Themes**: Light/dark mode following OS preference with manual toggle
 
 ## Working with Obsidian Vaults
 
 - Notes are plain Markdown with YAML frontmatter for metadata
 - `[[wikilinks]]` for internal linking between notes
+- **Daily notes**: `Observations/YYYY-MM-DD-Daily.md` with tags `daily` + `observation`
 - The `.obsidian/` directory contains Obsidian app config — don't modify directly
 - This is a headless setup (no desktop app) — use `ob sync` for cloud sync
