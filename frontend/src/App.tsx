@@ -34,8 +34,8 @@ export default function App() {
   // Load recent notes on mount
   useEffect(() => {
     fetch(`${API}recent/?size=20`)
-      .then((r) => r.json())
-      .then((d) => setResults(d.results))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.results && setResults(d.results))
       .catch(() => {});
   }, []);
 
@@ -62,7 +62,7 @@ export default function App() {
       body: JSON.stringify({ query, size: 20 }),
     });
     const data = await resp.json();
-    setResults(data.results);
+    if (data?.results) setResults(data.results);
   };
 
   const handleSelect = async (path: string) => {

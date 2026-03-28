@@ -29,6 +29,24 @@ async def create_note(note: NoteCreate, background_tasks: BackgroundTasks):
     return {"status": "created", "path": note.path}
 
 
+@router.get("/recent/")
+async def recent(size: int = 20):
+    """Return the most recently modified notes."""
+    return {"results": recent_notes(size)}
+
+
+@router.post("/search/")
+async def search(query: SearchQuery):
+    """Full-text search across indexed notes."""
+    return {"results": search_notes(query.query, query.size)}
+
+
+@router.post("/semantic-search/")
+async def semantic(query: SearchQuery):
+    """Semantic search using Jina embeddings."""
+    return {"results": semantic_search(query.query, query.size)}
+
+
 @router.get("/{path:path}")
 async def get_note(path: str):
     """Read a note directly from the vault."""
@@ -48,21 +66,3 @@ async def remove_note(path: str):
     delete_note(path)
     delete_from_index(path)
     return {"status": "deleted", "path": path}
-
-
-@router.get("/recent/")
-async def recent(size: int = 20):
-    """Return the most recently modified notes."""
-    return {"results": recent_notes(size)}
-
-
-@router.post("/search/")
-async def search(query: SearchQuery):
-    """Full-text search across indexed notes."""
-    return {"results": search_notes(query.query, query.size)}
-
-
-@router.post("/semantic-search/")
-async def semantic(query: SearchQuery):
-    """Semantic search using Jina embeddings."""
-    return {"results": semantic_search(query.query, query.size)}
