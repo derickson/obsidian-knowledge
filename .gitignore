@@ -12,9 +12,8 @@ frontend/dist/
 # Environment
 .env
 
-# Obsidian
-vaults/*/.obsidian/workspace.json
-vaults/*/.obsidian/workspace-mobile.json
+# Obsidian vault contents (vault is synced via `ob sync`, not git)
+vaults/AgentKnowledge/
 
 # Docker
 docker-compose.override.yml

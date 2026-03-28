@@ -50,12 +50,39 @@ graph TD
 - **`ob sync`** keeps the vault in sync with Obsidian cloud (headless, no desktop app)
 - **Post-processing pipeline** runs in background after note creation (indexing, sync, future cross-linking)
 
-## Setup
+## Prerequisites
+
+### Obsidian Headless
+
+Install the [Obsidian CLI](https://obsidian.md/cli) (`ob`), then log in and set up vault sync:
+
+```bash
+# Log in to your Obsidian account
+ob login
+
+# Create a remote vault (first time only) or list existing ones
+ob sync-create-remote --name AgentKnowledge
+# or: ob sync-list-remote
+
+# Link the local vault directory to the remote vault
+ob sync-setup --path vaults/AgentKnowledge --remote-vault AgentKnowledge
+
+# Pull down existing notes (or confirm sync is working)
+ob sync --path vaults/AgentKnowledge
+```
+
+After setup, `ob sync` will push and pull changes between this server and Obsidian cloud.
+
+### Environment
 
 ```bash
 cp .env.example .env
 # Fill in ES_CLOUD_ID, ES_API_KEY, ANTHROPIC_API_KEY
+```
 
+## Setup
+
+```bash
 make build
 make up
 ```
