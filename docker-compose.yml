@@ -12,6 +12,9 @@ services:
       - ./vaults/AgentKnowledge:/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge
     env_file:
       - .env
+    environment:
+      - HOME=/tmp
+      - UV_CACHE_DIR=/tmp/.cache/uv
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3104"]
     restart: unless-stopped
 
