@@ -29,7 +29,7 @@ files with YAML frontmatter for metadata and [[wikilinks]] for cross-referencing
 - **Root level**: Primary entries on people, concepts, or tools (e.g., `Dave Erickson.md`, `Elasticsearch.md`)
 - **Meetings/**: Time-driven meeting notes as `Meetings/YYYY-MM-DD-Meeting-Name.md`
 - **Observations/**: Journal entries, thoughts, and general observations as `Observations/YYYY-MM-DD-Topic.md`
-- **Content/**: Notes on consumed content (videos, articles, books) as `Content/YYYY-MM-DD-Title.md`
+- **Content/**: Notes on consumed content (videos, articles, books) as `Content/Title.md`
 - **Inbox/**: Staging area for unsorted or auto-ingested notes
 - **TestData/**: Reserved for automated tests — do not use
 
