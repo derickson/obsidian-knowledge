@@ -95,18 +95,15 @@ ob sync-status --path vaults/AgentKnowledge
 
 After setup, `ob sync` will push and pull changes between this server and Obsidian cloud. The backend triggers `ob sync` automatically after note creation via the API.
 
-To periodically pull changes made on other devices, add a cron job:
+To periodically pull changes made on other devices, add a cron job. A helper script is provided at `scripts/ob-sync.sh` that sets up the nvm PATH (cron doesn't load it):
 
 ```bash
-# Run every 5 minutes — edit the path to match your install
 crontab -e
 ```
 
 ```
-*/5 * * * * /home/dave/.nvm/versions/node/v22.22.1/bin/ob sync --path /home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge >> /tmp/ok-obsidian-sync.log 2>&1
+*/5 * * * * /home/dave/dev/obsidian-knowledge/scripts/ob-sync.sh >> /tmp/ok-obsidian-sync.log 2>&1
 ```
-
-Note: Use the full path to `ob` since cron doesn't load nvm. Find yours with `which ob`.
 
 ### Environment
 
