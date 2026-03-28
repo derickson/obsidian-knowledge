@@ -6,12 +6,26 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-# Load obsidian-headless sync module directly to avoid app namespace collision
 _headless_root = Path(__file__).resolve().parent.parent / "obsidian-headless"
-_spec = importlib.util.spec_from_file_location("headless_sync", _headless_root / "app/sync.py")
-_sync_mod = importlib.util.module_from_spec(_spec)
-sys.modules["headless_sync"] = _sync_mod
-_spec.loader.exec_module(_sync_mod)
+
+
+def _import_headless(module_path: str, name: str):
+    spec = importlib.util.spec_from_file_location(name, _headless_root / module_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# Load headless config first, then swap app.config temporarily to load sync module
+_headless_config = _import_headless("app/config.py", "headless_config")
+_orig_config = sys.modules.get("app.config")
+sys.modules["app.config"] = _headless_config
+_sync_mod = _import_headless("app/sync.py", "headless_sync")
+if _orig_config:
+    sys.modules["app.config"] = _orig_config
+else:
+    del sys.modules["app.config"]
+
 run_ob_sync = _sync_mod.run_ob_sync
 
 

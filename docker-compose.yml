@@ -7,6 +7,8 @@ services:
       - "3104:3104"
     volumes:
       - ./vaults:/app/vaults
+      - /home/dave/.config/obsidian-headless:/root/.config/obsidian-headless
+      - ./vaults/AgentKnowledge:/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge
     env_file:
       - .env
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3104"]

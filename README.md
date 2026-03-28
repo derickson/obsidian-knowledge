@@ -103,8 +103,10 @@ crontab -e
 ```
 
 ```
-*/5 * * * * cd /home/dave/dev/obsidian-knowledge && ob sync --path vaults/AgentKnowledge >> /tmp/ok-obsidian-sync.log 2>&1
+*/5 * * * * /home/dave/.nvm/versions/node/v22.22.1/bin/ob sync --path /home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge >> /tmp/ok-obsidian-sync.log 2>&1
 ```
+
+Note: Use the full path to `ob` since cron doesn't load nvm. Find yours with `which ob`.
 
 ### Environment
 

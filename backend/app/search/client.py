@@ -97,6 +97,7 @@ def semantic_search(query: str, size: int = 10) -> list[dict]:
                         "weight": 0.7,
                     },
                 ],
+                "rank_window_size": max(size, 100),
             }
         },
         size=size,
