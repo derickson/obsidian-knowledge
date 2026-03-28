@@ -48,6 +48,7 @@ make logs            # Tail logs
 # Local development (bare metal)
 make dev             # Start all 3 services with hot reload
 make dev-stop        # Stop all dev servers
+# Dev ports: headless=3104, backend=3105, frontend=8104
 
 # Obsidian
 ob sync              # Sync vault with Obsidian cloud

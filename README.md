@@ -56,11 +56,11 @@ graph TD
 
 ### Services
 
-| Service | Port | Role |
-|---------|------|------|
-| **obsidian-headless** | 8100 | Owns the vault filesystem and `ob` CLI. FastAPI service for vault read/write/list/delete and sync. Only container that mounts `vaults/`. |
-| **backend** | 8000 | FastAPI + FastMCP. REST API + MCP server for external access. Calls headless for vault I/O, manages ES indexing and post-processing pipeline. |
-| **frontend** | 5173 | React/Vite search UI. |
+| Service | Docker | Dev | Role |
+|---------|--------|-----|------|
+| **obsidian-headless** | 8100 | 3104 | Owns the vault filesystem and `ob` CLI. FastAPI service for vault read/write/list/delete and sync. Only container that mounts `vaults/`. |
+| **backend** | 8000 | 3105 | FastAPI + FastMCP. REST API + MCP server for external access. Calls headless for vault I/O, manages ES indexing and post-processing pipeline. |
+| **frontend** | 5173 | 8104 | React/Vite search UI. |
 
 The backend never touches vault files directly — all vault I/O goes through the obsidian-headless service via HTTP.
 

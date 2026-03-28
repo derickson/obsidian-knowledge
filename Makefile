@@ -29,24 +29,27 @@ logs:
 
 dev:
 	@echo "Starting dev servers..."
-	nohup uv run uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload --app-dir obsidian-headless > /tmp/ok-headless.log 2>&1 &
-	HEADLESS_URL=http://localhost:8100 nohup uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --app-dir backend > /tmp/ok-backend.log 2>&1 &
-	cd frontend && nohup npx vite --host 0.0.0.0 --port 5173 > /tmp/ok-frontend.log 2>&1 &
+	nohup uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 3104 --reload --app-dir obsidian-headless > /tmp/ok-headless.log 2>&1 &
+	HEADLESS_URL=http://localhost:3104 nohup uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 3105 --reload --app-dir backend > /tmp/ok-backend.log 2>&1 &
+	cd frontend && nohup npx vite --host 0.0.0.0 --port 8104 > /tmp/ok-frontend.log 2>&1 &
 	@echo "Logs: /tmp/ok-headless.log, /tmp/ok-backend.log, /tmp/ok-frontend.log"
+	@echo "  headless: http://localhost:3104"
+	@echo "  backend:  http://localhost:3105"
+	@echo "  frontend: http://localhost:8104"
 
 dev-stop:
 	@echo "Stopping dev servers..."
-	-pkill -f "uvicorn app.main:app.*--port 8100"
-	-pkill -f "uvicorn app.main:app.*--port 8000"
-	-pkill -f "vite.*--port 5173"
+	-pkill -f "uvicorn app.main:app.*--port 3104"
+	-pkill -f "uvicorn app.main:app.*--port 3105"
+	-pkill -f "vite.*--port 8104"
 
 # --- Admin ---
 
 sync:
-	curl -s -X POST http://localhost:8100/sync/ | python3 -m json.tool
+	curl -s -X POST http://localhost:3104/sync/ | python3 -m json.tool
 
 reindex:
-	curl -s -X POST http://localhost:8000/obsidian-knowledge/api/admin/reindex/ | python3 -m json.tool
+	curl -s -X POST http://localhost:3105/obsidian-knowledge/api/admin/reindex/ | python3 -m json.tool
 
 # --- Testing ---
 
