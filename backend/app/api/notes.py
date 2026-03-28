@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.pipeline.runner import process_note
 from app.search.client import recent_notes, search_notes, semantic_search
 from app.search.indexer import delete_from_index
-from app.vault.reader import read_note
+from app.vault.reader import list_notes, read_note
 from app.vault.writer import write_note, delete_note
 
 router = APIRouter()
@@ -27,6 +27,12 @@ async def create_note(note: NoteCreate, background_tasks: BackgroundTasks):
     write_note(note.path, note.content, note.metadata)
     background_tasks.add_task(process_note, note.path)
     return {"status": "created", "path": note.path}
+
+
+@router.get("/list/")
+async def list_all():
+    """Return all note paths in the vault."""
+    return {"notes": list_notes()}
 
 
 @router.get("/recent/")

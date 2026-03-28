@@ -59,6 +59,8 @@ export default function App() {
   );
   const [mobileView, setMobileView] = useState<MobileView>("list");
 
+  const [existingNotes, setExistingNotes] = useState<Set<string>>(new Set());
+
   const [chatOpen, setChatOpen] = useState(window.innerWidth >= 768);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -69,11 +71,19 @@ export default function App() {
 
   const isMobile = useIsMobile();
 
+  const refreshNoteList = () => {
+    fetch(`${API}list/`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.notes && setExistingNotes(new Set(d.notes)))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetch(`${API}recent/?size=20`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.results && setResults(d.results))
       .catch(() => {});
+    refreshNoteList();
   }, []);
 
   useEffect(() => {
@@ -196,6 +206,7 @@ export default function App() {
                 .then((r) => (r.ok ? r.json() : null))
                 .then((d) => d?.results && setResults(d.results))
                 .catch(() => {});
+              refreshNoteList();
             }
           } catch {
             // skip malformed SSE lines
@@ -217,6 +228,11 @@ export default function App() {
     setActiveTool(null);
   };
 
+  const noteExists = (target: string): boolean => {
+    const path = target.endsWith(".md") ? target : `${target}.md`;
+    return existingNotes.has(path);
+  };
+
   const mdComponents = {
     a: ({
       href,
@@ -230,16 +246,21 @@ export default function App() {
         : null;
 
       if (wikilinkTarget) {
+        const exists = noteExists(wikilinkTarget);
+        const linkStyle = exists
+          ? (dark ? themes.dark.wikilink : themes.light.wikilink)
+          : (dark ? themes.dark.deadWikilink : themes.light.deadWikilink);
         return (
           <a
             {...props}
             href="javascript:void(0)"
-            style={dark ? themes.dark.wikilink : themes.light.wikilink}
+            style={linkStyle}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              handleSelect(`${wikilinkTarget}.md`);
+              if (exists) handleSelect(`${wikilinkTarget}.md`);
             }}
+            title={exists ? wikilinkTarget : `${wikilinkTarget} (not yet created)`}
           >
             {children}
           </a>
@@ -256,17 +277,22 @@ export default function App() {
       }
 
       // Anything else: treat as internal note reference
+      const notePath = href?.endsWith(".md") ? href || "" : `${href}.md`;
+      const exists = existingNotes.has(notePath);
+      const linkStyle = exists
+        ? (dark ? themes.dark.wikilink : themes.light.wikilink)
+        : (dark ? themes.dark.deadWikilink : themes.light.deadWikilink);
       return (
         <a
           {...props}
           href="javascript:void(0)"
-          style={dark ? themes.dark.wikilink : themes.light.wikilink}
+          style={linkStyle}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const notePath = href?.endsWith(".md") ? href : `${href}.md`;
-            handleSelect(notePath);
+            if (exists) handleSelect(notePath);
           }}
+          title={exists ? notePath : `${notePath} (not yet created)`}
         >
           {children}
         </a>
@@ -388,15 +414,19 @@ export default function App() {
                   flexWrap: "wrap",
                 }}
               >
-                {selected.wikilinks.map((link) => (
-                  <span
-                    key={link}
-                    style={theme.wikilink}
-                    onClick={() => handleSelect(`${link}.md`)}
-                  >
-                    [[{link}]]
-                  </span>
-                ))}
+                {selected.wikilinks.map((link) => {
+                  const exists = noteExists(link);
+                  return (
+                    <span
+                      key={link}
+                      style={exists ? theme.wikilink : theme.deadWikilink}
+                      onClick={() => exists && handleSelect(`${link}.md`)}
+                      title={exists ? link : `${link} (not yet created)`}
+                    >
+                      [[{link}]]
+                    </span>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -750,6 +780,16 @@ const themes = {
       color: "#2563eb",
       cursor: "pointer" as const,
     },
+    deadWikilink: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 12,
+      background: "#fee2e2",
+      color: "#991b1b",
+      cursor: "default" as const,
+      opacity: 0.7,
+      textDecoration: "line-through" as const,
+    },
     markdownBody: {
       padding: "16px 24px",
       flex: 1,
@@ -950,6 +990,16 @@ const themes = {
       background: "#1e3a5f",
       color: "#60a5fa",
       cursor: "pointer" as const,
+    },
+    deadWikilink: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 12,
+      background: "#3b1111",
+      color: "#fca5a5",
+      cursor: "default" as const,
+      opacity: 0.7,
+      textDecoration: "line-through" as const,
     },
     markdownBody: {
       padding: "16px 24px",
