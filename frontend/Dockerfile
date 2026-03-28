@@ -1,11 +1,27 @@
+FROM node:22-slim AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+ARG API_PREFIX=/obsidian-knowledge
+ENV API_PREFIX=${API_PREFIX}
+
+RUN npm run build
+
 FROM node:22-slim
 
 WORKDIR /app
 
-COPY package.json .
-RUN npm install
+RUN npm install -g serve
 
-COPY . .
+COPY --from=build /app/dist ./dist
 
-EXPOSE 5173
-CMD ["npm", "run", "dev"]
+ARG API_PREFIX=/obsidian-knowledge
+ENV API_PREFIX=${API_PREFIX}
+
+EXPOSE 8104
+CMD ["sh", "-c", "serve -s dist -l 8104 --single"]

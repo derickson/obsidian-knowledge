@@ -1,10 +1,13 @@
-.PHONY: init up down build redeploy logs dev dev-stop sync reindex test test-integration lint
+.PHONY: init up down build redeploy logs dev dev-stop sync reindex test test-integration lint build-frontend
 
 # --- Setup ---
 
 init:
 	cd frontend && npm install
 	uv sync --extra dev
+
+build-frontend:
+	cd frontend && API_PREFIX=/obsidian-knowledge npm run build
 
 # --- Docker (production) ---
 

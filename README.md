@@ -8,7 +8,7 @@ Agentic knowledge server that unifies knowledge across projects. Uses an Obsidia
 graph TD
     subgraph Clients
         MCP[MCP Clients<br><i>Claude, Cursor, etc.</i>]
-        UI[Web UI<br><i>React / Vite · :8104</i>]
+        UI[Web UI<br><i>React · nginx or :8104</i>]
         REST[REST Clients<br><i>External systems</i>]
     end
 
@@ -62,7 +62,7 @@ Same ports for both local dev (`make dev`) and Docker (`make up`):
 |---------|------|------|
 | **obsidian-headless** | 3104 | Owns the vault filesystem and `ob` CLI. FastAPI service for vault read/write/list/delete and sync. Only container that mounts `vaults/`. |
 | **backend** | 3105 | FastAPI + FastMCP. REST API + MCP server for external access. Calls headless for vault I/O, manages ES indexing and post-processing pipeline. |
-| **frontend** | 8104 | React/Vite search UI served under the API prefix. |
+| **frontend** | 8104 (dev) | React/Vite search UI. In dev: Vite dev server with HMR. In production: static files served by nginx from `frontend/dist/`. |
 
 The backend never touches vault files directly — all vault I/O goes through the obsidian-headless service via HTTP.
 
@@ -128,6 +128,16 @@ make down            # Stop all services
 make redeploy        # down + build + up
 make logs            # Tail logs
 ```
+
+### Production with nginx
+
+When serving behind nginx, the frontend is built as static files and served directly by nginx (no frontend container needed):
+
+```bash
+make build-frontend  # Build static files to frontend/dist/
+```
+
+nginx serves `/obsidian-knowledge/` from `frontend/dist/`, proxies `/obsidian-knowledge/api/` and `/obsidian-knowledge/mcp/` to the backend on port 3105. Run `make build-frontend` after any frontend code changes.
 
 ### Local development (bare metal)
 

@@ -49,6 +49,9 @@ make logs            # Tail logs
 make dev             # Start all 3 services with hot reload
 make dev-stop        # Stop all dev servers
 
+# Frontend
+make build-frontend  # Build static files for nginx (frontend/dist/)
+
 # Obsidian
 ob sync              # Sync vault with Obsidian cloud
 make sync            # Trigger sync via headless service
@@ -119,7 +122,8 @@ POST /obsidian-knowledge/api/notes/
 
 - Vite + React 19 + TypeScript
 - Served under `API_PREFIX` (default `/obsidian-knowledge/`)
-- Proxies `API_PREFIX/api/` and `API_PREFIX/mcp/` to backend
+- **Dev**: Vite dev server on port 8104 with HMR, proxies API/MCP to backend
+- **Production**: `make build-frontend` builds static files to `frontend/dist/`, served by nginx directly
 - Search UI with full-text and hybrid semantic modes (defaults to semantic)
 
 ## Working with Obsidian Vaults
