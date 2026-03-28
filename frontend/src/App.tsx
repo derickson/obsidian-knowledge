@@ -247,6 +247,52 @@ export default function App() {
     },
   };
 
+  const handleToday = async () => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const path = `Observations/${dateStr}-Daily.md`;
+
+    // Try to read it first
+    const resp = await fetch(`${API}${encodeURIComponent(path)}`);
+    if (resp.ok) {
+      setSelected(await resp.json());
+      if (isMobile) setMobileView("detail");
+      return;
+    }
+
+    // Create it
+    const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
+    await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path,
+        content: `# Daily Observations — ${dayName}, ${dateStr}\n\n`,
+        metadata: {
+          title: `Daily Observations ${dateStr}`,
+          tags: ["observation", "daily"],
+          date: dateStr,
+        },
+      }),
+    });
+
+    // Now read and select it
+    const readResp = await fetch(`${API}${encodeURIComponent(path)}`);
+    if (readResp.ok) {
+      setSelected(await readResp.json());
+      if (isMobile) setMobileView("detail");
+    }
+
+    // Refresh the list
+    fetch(`${API}recent/?size=20`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.results && setResults(d.results))
+      .catch(() => {});
+  };
+
   const theme = dark ? themes.dark : themes.light;
 
   // --- Shared panel renderers ---
@@ -458,24 +504,18 @@ export default function App() {
         <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
           Obsidian Knowledge
         </h1>
-        {!isMobile && (
-          <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={handleToday} style={theme.headerButton}>
+            Today
+          </button>
+          {!isMobile && (
             <button
               onClick={() => setChatOpen(!chatOpen)}
               style={theme.headerButton}
             >
               {chatOpen ? "Close Chat" : "Chat"}
             </button>
-            <button
-              onClick={() => setDark(!dark)}
-              style={theme.headerButton}
-              title="Toggle theme"
-            >
-              {dark ? "Light" : "Dark"}
-            </button>
-          </div>
-        )}
-        {isMobile && (
+          )}
           <button
             onClick={() => setDark(!dark)}
             style={theme.headerButton}
@@ -483,7 +523,7 @@ export default function App() {
           >
             {dark ? "Light" : "Dark"}
           </button>
-        )}
+        </div>
       </header>
 
       {/* Search bar */}
