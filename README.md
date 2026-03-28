@@ -8,7 +8,7 @@ Agentic knowledge server that unifies knowledge across projects. Uses an Obsidia
 graph TD
     subgraph Clients
         MCP[MCP Clients<br><i>Claude, Cursor, etc.</i>]
-        UI[Web UI<br><i>React / Vite</i>]
+        UI[Web UI<br><i>React / Vite · :8104</i>]
         REST[REST Clients<br><i>External systems</i>]
     end
 
@@ -25,7 +25,7 @@ graph TD
 
     subgraph Storage
         Vault[(Obsidian Vault<br><i>source of truth</i>)]
-        ES[(Elasticsearch<br><i>read-only mirror</i>)]
+        ES[(Elasticsearch Serverless<br><i>read-only mirror · hybrid search</i>)]
         Cloud[Obsidian Cloud]
     end
 
@@ -56,11 +56,13 @@ graph TD
 
 ### Services
 
+Same ports for both local dev (`make dev`) and Docker (`make up`):
+
 | Service | Port | Role |
 |---------|------|------|
 | **obsidian-headless** | 3104 | Owns the vault filesystem and `ob` CLI. FastAPI service for vault read/write/list/delete and sync. Only container that mounts `vaults/`. |
 | **backend** | 3105 | FastAPI + FastMCP. REST API + MCP server for external access. Calls headless for vault I/O, manages ES indexing and post-processing pipeline. |
-| **frontend** | 8104 | React/Vite search UI. |
+| **frontend** | 8104 | React/Vite search UI served under the API prefix. |
 
 The backend never touches vault files directly — all vault I/O goes through the obsidian-headless service via HTTP.
 
@@ -139,9 +141,12 @@ Dev logs are written to `/tmp/ok-headless.log`, `/tmp/ok-backend.log`, `/tmp/ok-
 ### Testing
 
 ```bash
-make test            # Run pytest
+make test            # Run unit tests (excludes integration)
+make test-integration # Run integration tests (requires make dev or make up)
 make lint            # Run ruff
 ```
+
+`make test-integration` runs an end-to-end lifecycle test: create a note, read it via headless and backend, search it in Elasticsearch (full-text and hybrid semantic), then delete it. Works against either `make dev` or `make up` since both use the same ports.
 
 The Python virtual environment lives at `~/.venvs/obsidian-knowledge` and is symlinked as `.venv` at the repo root.
 
@@ -152,7 +157,6 @@ All endpoints are served under a configurable prefix (default: `/obsidian-knowle
 ## Ingest API
 
 ```bash
-# Dev port 3105, Docker port 8000
 curl -X POST http://localhost:3105/obsidian-knowledge/api/notes/ \
   -H "Content-Type: application/json" \
   -d '{
@@ -168,8 +172,8 @@ curl -X POST http://localhost:3105/obsidian-knowledge/api/notes/ \
 
 The MCP server is mounted at `/obsidian-knowledge/mcp/` and exposes tools for agentic access:
 
-- `search` — full-text search
-- `semantic` — semantic search via Jina embeddings
+- `search` — full-text BM25 search
+- `semantic` — hybrid search (linear fusion of BM25 + Jina vector embeddings)
 - `read` — read a specific note
 - `create` — create/update a note
 - `list_all_notes` — list notes, optionally by folder
@@ -177,7 +181,8 @@ The MCP server is mounted at `/obsidian-knowledge/mcp/` and exposes tools for ag
 
 ## Tech Stack
 
-- **Backend**: Python 3.12, FastAPI, FastMCP, Elasticsearch, uv
-- **Obsidian Headless**: Python 3.12, FastAPI, Node.js (for `ob` CLI)
+- **Backend**: Python 3.12, FastAPI, FastMCP, Elasticsearch, Elastic APM, uv
+- **Obsidian Headless**: Python 3.12, FastAPI, Elastic APM, Node.js (for `ob` CLI)
 - **Frontend**: React 19, Vite, TypeScript
+- **Search**: Elasticsearch Serverless, Jina v3 small embeddings via `semantic_text`, hybrid retriever with linear fusion
 - **Infrastructure**: Docker Compose, Obsidian Headless (`ob sync`)

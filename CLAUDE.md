@@ -24,11 +24,11 @@ MCP Clients / Web UI / REST Clients
 
 ### Service architecture (Docker)
 
-Three containers in docker-compose:
+Three containers in docker-compose (same ports for dev and Docker):
 
-- **obsidian-headless** (port 8100): Owns the vault filesystem and `ob` CLI. Runs a FastAPI service that exposes vault read/write/delete/list and sync operations over HTTP. Only container that mounts the `vaults/` volume.
-- **backend** (port 8000): FastAPI + FastMCP. REST API + MCP server. Calls obsidian-headless for vault operations, manages ES indexing, runs post-processing pipeline.
-- **frontend** (port 5173): React/Vite UI.
+- **obsidian-headless** (port 3104): Owns the vault filesystem and `ob` CLI. Runs a FastAPI service that exposes vault read/write/delete/list and sync operations over HTTP. Only container that mounts the `vaults/` volume.
+- **backend** (port 3105): FastAPI + FastMCP. REST API + MCP server. Calls obsidian-headless for vault operations, manages ES indexing, runs post-processing pipeline.
+- **frontend** (port 8104): React/Vite UI.
 
 The backend never touches vault files directly — all vault I/O goes through the obsidian-headless service via HTTP.
 
@@ -48,7 +48,6 @@ make logs            # Tail logs
 # Local development (bare metal)
 make dev             # Start all 3 services with hot reload
 make dev-stop        # Stop all dev servers
-# Dev ports: headless=3104, backend=3105, frontend=8104
 
 # Obsidian
 ob sync              # Sync vault with Obsidian cloud
@@ -56,7 +55,7 @@ make sync            # Trigger sync via headless service
 
 # Testing & linting
 make test            # Run unit tests (excludes integration)
-make test-integration # Run integration tests (requires make dev)
+make test-integration # Run integration tests (requires make dev or make up)
 make lint            # Run ruff
 uv run pytest tests/test_vault_reader.py -v  # Run a single test file
 uv run pytest -k test_read_existing_note     # Run a single test by name
@@ -119,8 +118,9 @@ POST /obsidian-knowledge/api/notes/
 ## Frontend (React/TypeScript)
 
 - Vite + React 19 + TypeScript
-- Proxies `API_PREFIX` to backend in dev mode
-- Minimal search UI (full-text and semantic modes)
+- Served under `API_PREFIX` (default `/obsidian-knowledge/`)
+- Proxies `API_PREFIX/api/` and `API_PREFIX/mcp/` to backend
+- Search UI with full-text and hybrid semantic modes (defaults to semantic)
 
 ## Working with Obsidian Vaults
 
