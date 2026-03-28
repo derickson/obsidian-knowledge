@@ -435,6 +435,7 @@ export default function App() {
 
   return (
     <div
+      className={dark ? "theme-dark" : "theme-light"}
       style={{
         ...theme.root,
         display: "flex",
