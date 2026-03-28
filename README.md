@@ -179,6 +179,52 @@ The MCP server is mounted at `/obsidian-knowledge/mcp/` and exposes tools for ag
 - `list_all_notes` — list notes, optionally by folder
 - `reindex` — full vault → ES resync
 
+### Connecting from Claude Desktop
+
+Add this to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "obsidian-knowledge": {
+      "type": "streamable-http",
+      "url": "http://localhost:3105/obsidian-knowledge/mcp/"
+    }
+  }
+}
+```
+
+### Connecting from Claude Code
+
+Add the MCP server to your project or global settings:
+
+```bash
+claude mcp add obsidian-knowledge --transport http http://localhost:3105/obsidian-knowledge/mcp/
+```
+
+Or add it manually to `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "obsidian-knowledge": {
+      "type": "streamable-http",
+      "url": "http://localhost:3105/obsidian-knowledge/mcp/"
+    }
+  }
+}
+```
+
+### Connecting from other MCP clients
+
+Any MCP client that supports Streamable HTTP transport can connect to:
+
+```
+http://localhost:3105/obsidian-knowledge/mcp/
+```
+
+Replace `localhost:3105` with your server's hostname/IP if connecting remotely.
+
 ## Tech Stack
 
 - **Backend**: Python 3.12, FastAPI, FastMCP, Elasticsearch, Elastic APM, uv
