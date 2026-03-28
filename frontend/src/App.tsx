@@ -59,7 +59,7 @@ export default function App() {
   );
   const [mobileView, setMobileView] = useState<MobileView>("list");
 
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(window.innerWidth >= 768);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatModel, setChatModel] = useState("claude-haiku-4-5-20251001");
@@ -390,13 +390,23 @@ export default function App() {
         <div ref={chatEndRef} />
       </div>
       <div style={theme.chatInputArea}>
-        <input
+        <textarea
           value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
-          placeholder="Ask about your notes..."
+          onChange={(e) => {
+            setChatInput(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = Math.min(e.target.scrollHeight, 150) + "px";
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleChatSend();
+            }
+          }}
+          placeholder="Ask about your notes... (Shift+Enter for newline)"
           style={theme.chatInput}
           disabled={chatStreaming}
+          rows={1}
         />
         <button
           onClick={handleChatSend}
@@ -737,6 +747,10 @@ const themes = {
       background: "#fff",
       color: "#1a1a1a",
       minWidth: 0,
+      resize: "none" as const,
+      overflow: "hidden",
+      lineHeight: 1.4,
+      fontFamily: "inherit",
     },
   },
   dark: {
@@ -934,6 +948,10 @@ const themes = {
       background: "#1e1e3a",
       color: "#e0e0e0",
       minWidth: 0,
+      resize: "none" as const,
+      overflow: "hidden",
+      lineHeight: 1.4,
+      fontFamily: "inherit",
     },
   },
 };
