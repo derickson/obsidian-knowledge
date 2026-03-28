@@ -223,24 +223,52 @@ export default function App() {
       children,
       ...props
     }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-      if (href?.startsWith("wikilink:")) {
-        const target = decodeURIComponent(href.slice(9));
+      // Check for wikilink: prefix (may be encoded or decoded by react-markdown)
+      const wikilinkTarget = href?.startsWith("wikilink:")
+        ? decodeURIComponent(href.slice(9))
+        : href?.startsWith("wikilink%3A")
+          ? decodeURIComponent(href.slice(11))
+          : null;
+
+      if (wikilinkTarget) {
         return (
           <a
             {...props}
-            href="#"
+            href="javascript:void(0)"
             style={dark ? themes.dark.wikilink : themes.light.wikilink}
             onClick={(e) => {
               e.preventDefault();
-              handleSelect(`${target}.md`);
+              e.stopPropagation();
+              handleSelect(`${wikilinkTarget}.md`);
             }}
           >
             {children}
           </a>
         );
       }
+
+      // External links open in new tab
+      if (href?.startsWith("http://") || href?.startsWith("https://")) {
+        return (
+          <a href={href} {...props} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        );
+      }
+
+      // Anything else: treat as internal note reference
       return (
-        <a href={href} {...props} target="_blank" rel="noopener noreferrer">
+        <a
+          {...props}
+          href="javascript:void(0)"
+          style={dark ? themes.dark.wikilink : themes.light.wikilink}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const notePath = href?.endsWith(".md") ? href : `${href}.md`;
+            handleSelect(notePath);
+          }}
+        >
           {children}
         </a>
       );
