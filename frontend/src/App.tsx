@@ -5,6 +5,16 @@ declare const __API_PREFIX__: string;
 const API = `${__API_PREFIX__}/api/notes/`;
 const CHAT_API = `${__API_PREFIX__}/api/chat/`;
 
+const WIKILINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+
+/** Replace [[wikilinks]] with markdown links that use a custom scheme. */
+function renderWikilinks(text: string): string {
+  return text.replace(WIKILINK_RE, (_match, target, alias) => {
+    const display = alias || target;
+    return `[${display}](wikilink:${encodeURIComponent(target)})`;
+  });
+}
+
 interface NoteListItem {
   path: string;
   title: string;
@@ -134,6 +144,7 @@ export default function App() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let notesMutated = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -160,8 +171,20 @@ export default function App() {
               });
             } else if (data.type === "tool_use_start") {
               setActiveTool(data.name);
+              if (["create", "delete", "reindex"].includes(data.name)) {
+                notesMutated = true;
+              }
             } else if (data.type === "tool_result") {
               setActiveTool(null);
+            } else if (data.type === "done" && notesMutated) {
+              // Reload the selected note and refresh the list
+              if (selected?.path) {
+                handleSelect(selected.path).catch(() => setSelected(null));
+              }
+              fetch(`${API}recent/?size=20`)
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => d?.results && setResults(d.results))
+                .catch(() => {});
             }
           } catch {
             // skip malformed SSE lines
@@ -181,6 +204,29 @@ export default function App() {
 
     setChatStreaming(false);
     setActiveTool(null);
+  };
+
+  // Custom markdown link renderer: intercepts wikilink: URLs
+  const mdComponents = {
+    a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+      if (href?.startsWith("wikilink:")) {
+        const target = decodeURIComponent(href.slice(9));
+        return (
+          <a
+            {...props}
+            href="#"
+            style={dark ? themes.dark.wikilink : themes.light.wikilink}
+            onClick={(e) => {
+              e.preventDefault();
+              handleSelect(`${target}.md`);
+            }}
+          >
+            {children}
+          </a>
+        );
+      }
+      return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
+    },
   };
 
   const theme = dark ? themes.dark : themes.light;
@@ -314,7 +360,7 @@ export default function App() {
                 )}
               </div>
               <div style={theme.markdownBody}>
-                <ReactMarkdown>{selected.content}</ReactMarkdown>
+                <ReactMarkdown components={mdComponents}>{renderWikilinks(selected.content)}</ReactMarkdown>
               </div>
             </>
           ) : (
@@ -363,7 +409,7 @@ export default function App() {
                   }
                 >
                   {msg.role === "assistant" ? (
-                    <ReactMarkdown>{msg.content || "..."}</ReactMarkdown>
+                    <ReactMarkdown components={mdComponents}>{renderWikilinks(msg.content || "...")}</ReactMarkdown>
                   ) : (
                     msg.content
                   )}
