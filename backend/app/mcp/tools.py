@@ -3,6 +3,7 @@ from fastmcp import FastMCP
 from app.config import settings
 from app.search.client import search_notes, semantic_search
 from app.search.indexer import index_note, reindex_all
+from app.sync import run_ob_sync
 from app.vault.reader import read_note, list_notes
 from app.vault.writer import write_note
 
@@ -44,7 +45,7 @@ def list_all_notes(folder: str | None = None) -> list[str]:
 
 
 @mcp.tool()
-def create(path: str, content: str, metadata: dict | None = None) -> dict:
+async def create(path: str, content: str, metadata: dict | None = None) -> dict:
     """Create or update a note in the knowledge base.
 
     Args:
@@ -55,6 +56,7 @@ def create(path: str, content: str, metadata: dict | None = None) -> dict:
     write_note(path, content, metadata)
     note = read_note(path)
     index_note(note)
+    await run_ob_sync()
     return {"status": "created", "path": path}
 
 
