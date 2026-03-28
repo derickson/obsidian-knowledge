@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.notes import router as notes_router
 from app.api.admin import router as admin_router
+from app.api.chat import router as chat_router
 from app.config import settings
 from app.mcp.tools import mcp
 from app.search.client import _es_client, get_es_client
@@ -37,6 +38,7 @@ app.add_middleware(
 
 app.include_router(notes_router, prefix=f"{prefix}/api/notes", tags=["notes"])
 app.include_router(admin_router, prefix=f"{prefix}/api/admin", tags=["admin"])
+app.include_router(chat_router, prefix=f"{prefix}/api/chat", tags=["chat"])
 
 # Mount MCP server
 app.mount(f"{prefix}/mcp", mcp_app)

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 declare const __API_PREFIX__: string;
 const API = `${__API_PREFIX__}/api/notes/`;
+const CHAT_API = `${__API_PREFIX__}/api/chat/`;
 
 interface NoteListItem {
   path: string;
@@ -22,6 +23,11 @@ interface NoteDetail {
   last_modified: number;
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export default function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NoteListItem[]>([]);
@@ -30,6 +36,15 @@ export default function App() {
   const [dark, setDark] = useState(
     window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
+
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatModel, setChatModel] = useState("claude-haiku-4-5-20251001");
+  const [chatStreaming, setChatStreaming] = useState(false);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Load recent notes on mount
   useEffect(() => {
@@ -47,11 +62,16 @@ export default function App() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, activeTool]);
+
   const handleSearch = async () => {
     if (!query.trim()) {
       const resp = await fetch(`${API}recent/?size=20`);
       const data = await resp.json();
-      setResults(data.results);
+      if (data?.results) setResults(data.results);
       return;
     }
     const endpoint =
@@ -72,20 +92,126 @@ export default function App() {
     }
   };
 
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || chatStreaming) return;
+
+    const userMsg: ChatMessage = { role: "user", content: chatInput };
+    const updated = [...chatMessages, userMsg];
+    setChatMessages([...updated, { role: "assistant", content: "" }]);
+    setChatInput("");
+    setChatStreaming(true);
+    setActiveTool(null);
+
+    try {
+      const apiMessages = updated.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const response = await fetch(CHAT_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: apiMessages,
+          model: chatModel,
+          focused_note_path: selected?.path || null,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        setChatMessages((prev) => {
+          const msgs = [...prev];
+          msgs[msgs.length - 1] = {
+            role: "assistant",
+            content: "Error: failed to connect to chat service.",
+          };
+          return msgs;
+        });
+        setChatStreaming(false);
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === "text") {
+              setChatMessages((prev) => {
+                const msgs = [...prev];
+                const last = msgs[msgs.length - 1];
+                msgs[msgs.length - 1] = {
+                  ...last,
+                  content: last.content + data.content,
+                };
+                return msgs;
+              });
+            } else if (data.type === "tool_use_start") {
+              setActiveTool(data.name);
+            } else if (data.type === "tool_result") {
+              setActiveTool(null);
+            }
+          } catch {
+            // skip malformed SSE lines
+          }
+        }
+      }
+    } catch {
+      setChatMessages((prev) => {
+        const msgs = [...prev];
+        msgs[msgs.length - 1] = {
+          role: "assistant",
+          content: "Error: connection lost.",
+        };
+        return msgs;
+      });
+    }
+
+    setChatStreaming(false);
+    setActiveTool(null);
+  };
+
   const theme = dark ? themes.dark : themes.light;
 
   return (
-    <div style={{ ...theme.root, display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div
+      style={{
+        ...theme.root,
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+      }}
+    >
       {/* Header */}
       <header style={theme.header}>
         <h1 style={{ margin: 0, fontSize: 18 }}>Obsidian Knowledge</h1>
-        <button
-          onClick={() => setDark(!dark)}
-          style={theme.themeToggle}
-          title="Toggle theme"
-        >
-          {dark ? "☀️" : "🌙"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            style={theme.headerButton}
+          >
+            {chatOpen ? "Close Chat" : "Chat"}
+          </button>
+          <button
+            onClick={() => setDark(!dark)}
+            style={theme.headerButton}
+            title="Toggle theme"
+          >
+            {dark ? "Light" : "Dark"}
+          </button>
+        </div>
       </header>
 
       {/* Search bar */}
@@ -110,7 +236,7 @@ export default function App() {
         </button>
       </div>
 
-      {/* Main content: list + detail */}
+      {/* Main content: list + detail + chat */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Left panel: results list */}
         <div style={theme.listPanel}>
@@ -139,7 +265,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Right panel: note detail */}
+        {/* Middle panel: note detail */}
         <div style={theme.detailPanel}>
           {selected ? (
             <>
@@ -151,7 +277,14 @@ export default function App() {
                     ` · ${new Date(selected.last_modified * 1000).toLocaleString()}`}
                 </div>
                 {selected.tags.length > 0 && (
-                  <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      display: "flex",
+                      gap: 4,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     {selected.tags.map((t) => (
                       <span key={t} style={theme.tag}>
                         #{t}
@@ -160,7 +293,14 @@ export default function App() {
                   </div>
                 )}
                 {selected.wikilinks.length > 0 && (
-                  <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      display: "flex",
+                      gap: 4,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     {selected.wikilinks.map((link) => (
                       <span
                         key={link}
@@ -183,22 +323,93 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {/* Right panel: chat */}
+        {chatOpen && (
+          <div style={theme.chatPanel}>
+            {/* Model selector + clear */}
+            <div style={theme.chatHeader}>
+              <select
+                value={chatModel}
+                onChange={(e) => setChatModel(e.target.value)}
+                style={{ ...theme.select, flex: 1 }}
+              >
+                <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+                <option value="claude-opus-4-6">Opus 4.6</option>
+              </select>
+              <button
+                onClick={() => setChatMessages([])}
+                style={theme.headerButton}
+                title="Clear chat"
+              >
+                Clear
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div style={theme.chatMessages}>
+              {chatMessages.length === 0 && (
+                <div style={{ opacity: 0.4, fontSize: 13, padding: 8 }}>
+                  Ask questions about your knowledge base...
+                </div>
+              )}
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  style={
+                    msg.role === "user"
+                      ? theme.chatUserMsg
+                      : theme.chatAssistantMsg
+                  }
+                >
+                  {msg.role === "assistant" ? (
+                    <ReactMarkdown>{msg.content || "..."}</ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
+              ))}
+              {activeTool && (
+                <div style={theme.chatToolIndicator}>
+                  Using tool: {activeTool}...
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input */}
+            <div style={theme.chatInputArea}>
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
+                placeholder="Ask about your notes..."
+                style={theme.chatInput}
+                disabled={chatStreaming}
+              />
+              <button
+                onClick={handleChatSend}
+                disabled={chatStreaming}
+                style={theme.button}
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 const shared = {
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  fontFamily:
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
 };
 
 const themes = {
   light: {
-    root: {
-      ...shared,
-      background: "#ffffff",
-      color: "#1a1a1a",
-    },
+    root: { ...shared, background: "#ffffff", color: "#1a1a1a" },
     header: {
       display: "flex" as const,
       justifyContent: "space-between" as const,
@@ -207,13 +418,14 @@ const themes = {
       borderBottom: "1px solid #e0e0e0",
       background: "#fafafa",
     },
-    themeToggle: {
+    headerButton: {
       background: "none",
       border: "1px solid #ddd",
       borderRadius: 6,
-      padding: "4px 8px",
+      padding: "4px 12px",
       cursor: "pointer" as const,
-      fontSize: 14,
+      fontSize: 13,
+      color: "#1a1a1a",
     },
     searchBar: {
       display: "flex" as const,
@@ -249,8 +461,8 @@ const themes = {
       cursor: "pointer" as const,
     },
     listPanel: {
-      width: 320,
-      minWidth: 320,
+      width: 280,
+      minWidth: 280,
       borderRight: "1px solid #e0e0e0",
       overflowY: "auto" as const,
       background: "#fafafa",
@@ -260,9 +472,7 @@ const themes = {
       borderBottom: "1px solid #eee",
       cursor: "pointer" as const,
     },
-    listItemSelected: {
-      background: "#ede9fe",
-    },
+    listItemSelected: { background: "#ede9fe" },
     detailPanel: {
       flex: 1,
       overflowY: "auto" as const,
@@ -294,13 +504,73 @@ const themes = {
       lineHeight: 1.7,
       fontSize: 15,
     },
+    chatPanel: {
+      width: 400,
+      minWidth: 400,
+      borderLeft: "1px solid #e0e0e0",
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      background: "#fafafa",
+    },
+    chatHeader: {
+      display: "flex" as const,
+      gap: 8,
+      padding: "8px 12px",
+      borderBottom: "1px solid #e0e0e0",
+    },
+    chatMessages: {
+      flex: 1,
+      overflowY: "auto" as const,
+      padding: 12,
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      gap: 8,
+    },
+    chatUserMsg: {
+      alignSelf: "flex-end" as const,
+      background: "#7c3aed",
+      color: "#fff",
+      padding: "8px 12px",
+      borderRadius: 12,
+      maxWidth: "85%",
+      fontSize: 14,
+      whiteSpace: "pre-wrap" as const,
+    },
+    chatAssistantMsg: {
+      alignSelf: "flex-start" as const,
+      background: "#f0f0f0",
+      color: "#1a1a1a",
+      padding: "8px 12px",
+      borderRadius: 12,
+      maxWidth: "90%",
+      fontSize: 14,
+      lineHeight: 1.6,
+    },
+    chatToolIndicator: {
+      alignSelf: "center" as const,
+      fontSize: 12,
+      opacity: 0.6,
+      fontStyle: "italic" as const,
+      padding: "4px 8px",
+    },
+    chatInputArea: {
+      display: "flex" as const,
+      gap: 8,
+      padding: "8px 12px",
+      borderTop: "1px solid #e0e0e0",
+    },
+    chatInput: {
+      flex: 1,
+      padding: "8px 12px",
+      border: "1px solid #ccc",
+      borderRadius: 6,
+      fontSize: 14,
+      background: "#fff",
+      color: "#1a1a1a",
+    },
   },
   dark: {
-    root: {
-      ...shared,
-      background: "#1a1a2e",
-      color: "#e0e0e0",
-    },
+    root: { ...shared, background: "#1a1a2e", color: "#e0e0e0" },
     header: {
       display: "flex" as const,
       justifyContent: "space-between" as const,
@@ -309,13 +579,13 @@ const themes = {
       borderBottom: "1px solid #2a2a4a",
       background: "#16162a",
     },
-    themeToggle: {
+    headerButton: {
       background: "none",
       border: "1px solid #444",
       borderRadius: 6,
-      padding: "4px 8px",
+      padding: "4px 12px",
       cursor: "pointer" as const,
-      fontSize: 14,
+      fontSize: 13,
       color: "#e0e0e0",
     },
     searchBar: {
@@ -352,8 +622,8 @@ const themes = {
       cursor: "pointer" as const,
     },
     listPanel: {
-      width: 320,
-      minWidth: 320,
+      width: 280,
+      minWidth: 280,
       borderRight: "1px solid #2a2a4a",
       overflowY: "auto" as const,
       background: "#16162a",
@@ -363,9 +633,7 @@ const themes = {
       borderBottom: "1px solid #2a2a4a",
       cursor: "pointer" as const,
     },
-    listItemSelected: {
-      background: "#2d1b69",
-    },
+    listItemSelected: { background: "#2d1b69" },
     detailPanel: {
       flex: 1,
       overflowY: "auto" as const,
@@ -396,6 +664,70 @@ const themes = {
       flex: 1,
       lineHeight: 1.7,
       fontSize: 15,
+    },
+    chatPanel: {
+      width: 400,
+      minWidth: 400,
+      borderLeft: "1px solid #2a2a4a",
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      background: "#16162a",
+    },
+    chatHeader: {
+      display: "flex" as const,
+      gap: 8,
+      padding: "8px 12px",
+      borderBottom: "1px solid #2a2a4a",
+    },
+    chatMessages: {
+      flex: 1,
+      overflowY: "auto" as const,
+      padding: 12,
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      gap: 8,
+    },
+    chatUserMsg: {
+      alignSelf: "flex-end" as const,
+      background: "#7c3aed",
+      color: "#fff",
+      padding: "8px 12px",
+      borderRadius: 12,
+      maxWidth: "85%",
+      fontSize: 14,
+      whiteSpace: "pre-wrap" as const,
+    },
+    chatAssistantMsg: {
+      alignSelf: "flex-start" as const,
+      background: "#1e1e3a",
+      color: "#e0e0e0",
+      padding: "8px 12px",
+      borderRadius: 12,
+      maxWidth: "90%",
+      fontSize: 14,
+      lineHeight: 1.6,
+    },
+    chatToolIndicator: {
+      alignSelf: "center" as const,
+      fontSize: 12,
+      opacity: 0.6,
+      fontStyle: "italic" as const,
+      padding: "4px 8px",
+    },
+    chatInputArea: {
+      display: "flex" as const,
+      gap: 8,
+      padding: "8px 12px",
+      borderTop: "1px solid #2a2a4a",
+    },
+    chatInput: {
+      flex: 1,
+      padding: "8px 12px",
+      border: "1px solid #444",
+      borderRadius: 6,
+      fontSize: 14,
+      background: "#1e1e3a",
+      color: "#e0e0e0",
     },
   },
 };
