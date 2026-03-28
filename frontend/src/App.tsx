@@ -560,27 +560,28 @@ export default function App() {
         <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
           Obsidian Knowledge
         </h1>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={handleToday} style={theme.headerButton}>
-            Today
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={handleToday} style={theme.iconButton} title="Today's observations">
+            &#x1F4C5;
           </button>
-          <button onClick={() => setShowInfo(true)} style={theme.headerButton}>
-            Info
+          <button onClick={() => setShowInfo(true)} style={theme.iconButton} title="Connection info">
+            &#x2139;&#xFE0E;
           </button>
           {!isMobile && (
             <button
               onClick={() => setChatOpen(!chatOpen)}
-              style={theme.headerButton}
+              style={theme.iconButton}
+              title={chatOpen ? "Close chat" : "Open chat"}
             >
-              {chatOpen ? "Close Chat" : "Chat"}
+              {chatOpen ? "&#x2715;" : "&#x1F4AC;"}
             </button>
           )}
           <button
             onClick={() => setDark(!dark)}
-            style={theme.headerButton}
+            style={theme.iconButton}
             title="Toggle theme"
           >
-            {dark ? "Light" : "Dark"}
+            {dark ? "&#x2600;&#xFE0E;" : "&#x263D;"}
           </button>
         </div>
       </header>
@@ -705,6 +706,16 @@ const themes = {
       cursor: "pointer" as const,
       fontSize: 13,
       color: "#1a1a1a",
+    },
+    iconButton: {
+      background: "none",
+      border: "none",
+      cursor: "pointer" as const,
+      fontSize: 18,
+      padding: "4px 8px",
+      color: "#555",
+      filter: "grayscale(1)",
+      opacity: 0.8,
     },
     searchBar: {
       display: "flex" as const,
@@ -952,6 +963,16 @@ const themes = {
       cursor: "pointer" as const,
       fontSize: 13,
       color: "#e0e0e0",
+    },
+    iconButton: {
+      background: "none",
+      border: "none",
+      cursor: "pointer" as const,
+      fontSize: 18,
+      padding: "4px 8px",
+      color: "#aaa",
+      filter: "grayscale(1)",
+      opacity: 0.8,
     },
     searchBar: {
       display: "flex" as const,
