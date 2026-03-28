@@ -7,7 +7,6 @@ const CHAT_API = `${__API_PREFIX__}/api/chat/`;
 
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
-/** Replace [[wikilinks]] with markdown links that use a custom scheme. */
 function renderWikilinks(text: string): string {
   return text.replace(WIKILINK_RE, (_match, target, alias) => {
     const display = alias || target;
@@ -38,6 +37,18 @@ interface ChatMessage {
   content: string;
 }
 
+type MobileView = "list" | "detail" | "chat";
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return mobile;
+}
+
 export default function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NoteListItem[]>([]);
@@ -46,8 +57,8 @@ export default function App() {
   const [dark, setDark] = useState(
     window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
+  const [mobileView, setMobileView] = useState<MobileView>("list");
 
-  // Chat state
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -56,7 +67,8 @@ export default function App() {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Load recent notes on mount
+  const isMobile = useIsMobile();
+
   useEffect(() => {
     fetch(`${API}recent/?size=20`)
       .then((r) => (r.ok ? r.json() : null))
@@ -64,7 +76,6 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Listen for OS theme changes
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => setDark(e.matches);
@@ -72,7 +83,6 @@ export default function App() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, activeTool]);
@@ -99,6 +109,7 @@ export default function App() {
     const resp = await fetch(`${API}${encodeURIComponent(path)}`);
     if (resp.ok) {
       setSelected(await resp.json());
+      if (isMobile) setMobileView("detail");
     }
   };
 
@@ -177,7 +188,6 @@ export default function App() {
             } else if (data.type === "tool_result") {
               setActiveTool(null);
             } else if (data.type === "done" && notesMutated) {
-              // Reload the selected note and refresh the list
               if (selected?.path) {
                 handleSelect(selected.path).catch(() => setSelected(null));
               }
@@ -206,9 +216,12 @@ export default function App() {
     setActiveTool(null);
   };
 
-  // Custom markdown link renderer: intercepts wikilink: URLs
   const mdComponents = {
-    a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+    a: ({
+      href,
+      children,
+      ...props
+    }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
       if (href?.startsWith("wikilink:")) {
         const target = decodeURIComponent(href.slice(9));
         return (
@@ -225,11 +238,199 @@ export default function App() {
           </a>
         );
       }
-      return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
+      return (
+        <a href={href} {...props} target="_blank" rel="noopener noreferrer">
+          {children}
+        </a>
+      );
     },
   };
 
   const theme = dark ? themes.dark : themes.light;
+
+  // --- Shared panel renderers ---
+
+  const renderListPanel = () => (
+    <div style={isMobile ? theme.listPanelMobile : theme.listPanel}>
+      {results.map((r) => (
+        <div
+          key={r.path}
+          onClick={() => handleSelect(r.path)}
+          style={{
+            ...theme.listItem,
+            ...(selected?.path === r.path ? theme.listItemSelected : {}),
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{r.title}</div>
+          <div style={{ fontSize: 11, opacity: 0.6 }}>{r.path}</div>
+          {r.tags && r.tags.length > 0 && (
+            <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>
+              {r.tags.map((t) => `#${t}`).join(" ")}
+            </div>
+          )}
+        </div>
+      ))}
+      {results.length === 0 && (
+        <div style={{ padding: 16, opacity: 0.5, fontSize: 13 }}>
+          No results
+        </div>
+      )}
+    </div>
+  );
+
+  const renderDetailPanel = () => (
+    <div style={isMobile ? theme.detailPanelMobile : theme.detailPanel}>
+      {selected ? (
+        <>
+          <div style={theme.detailHeader}>
+            <h2 style={{ margin: 0, fontSize: 20 }}>{selected.title}</h2>
+            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 4 }}>
+              {selected.path}
+              {selected.last_modified &&
+                ` · ${new Date(selected.last_modified * 1000).toLocaleString()}`}
+            </div>
+            {selected.tags.length > 0 && (
+              <div
+                style={{
+                  marginTop: 6,
+                  display: "flex",
+                  gap: 4,
+                  flexWrap: "wrap",
+                }}
+              >
+                {selected.tags.map((t) => (
+                  <span key={t} style={theme.tag}>
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
+            {selected.wikilinks.length > 0 && (
+              <div
+                style={{
+                  marginTop: 6,
+                  display: "flex",
+                  gap: 4,
+                  flexWrap: "wrap",
+                }}
+              >
+                {selected.wikilinks.map((link) => (
+                  <span
+                    key={link}
+                    style={theme.wikilink}
+                    onClick={() => handleSelect(`${link}.md`)}
+                  >
+                    [[{link}]]
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={theme.markdownBody}>
+            <ReactMarkdown components={mdComponents}>
+              {renderWikilinks(selected.content)}
+            </ReactMarkdown>
+          </div>
+        </>
+      ) : (
+        <div style={{ padding: 32, opacity: 0.4, fontSize: 14 }}>
+          Select a note to view its content
+        </div>
+      )}
+    </div>
+  );
+
+  const renderChatPanel = () => (
+    <div style={isMobile ? theme.chatPanelMobile : theme.chatPanel}>
+      <div style={theme.chatHeader}>
+        <select
+          value={chatModel}
+          onChange={(e) => setChatModel(e.target.value)}
+          style={{ ...theme.select, flex: 1 }}
+        >
+          <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+          <option value="claude-opus-4-6">Opus 4.6</option>
+        </select>
+        <button
+          onClick={() => setChatMessages([])}
+          style={theme.headerButton}
+          title="Clear chat"
+        >
+          Clear
+        </button>
+      </div>
+      <div style={theme.chatMessages}>
+        {chatMessages.length === 0 && (
+          <div style={{ opacity: 0.4, fontSize: 13, padding: 8 }}>
+            Ask questions about your knowledge base...
+          </div>
+        )}
+        {chatMessages.map((msg, i) => (
+          <div
+            key={i}
+            style={
+              msg.role === "user" ? theme.chatUserMsg : theme.chatAssistantMsg
+            }
+          >
+            {msg.role === "assistant" ? (
+              <ReactMarkdown components={mdComponents}>
+                {renderWikilinks(msg.content || "...")}
+              </ReactMarkdown>
+            ) : (
+              msg.content
+            )}
+          </div>
+        ))}
+        {activeTool && (
+          <div style={theme.chatToolIndicator}>
+            Using tool: {activeTool}...
+          </div>
+        )}
+        <div ref={chatEndRef} />
+      </div>
+      <div style={theme.chatInputArea}>
+        <input
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
+          placeholder="Ask about your notes..."
+          style={theme.chatInput}
+          disabled={chatStreaming}
+        />
+        <button
+          onClick={handleChatSend}
+          disabled={chatStreaming}
+          style={theme.button}
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+
+  // --- Mobile tab bar ---
+
+  const renderMobileNav = () => (
+    <div style={theme.mobileNav}>
+      {(["list", "detail", "chat"] as MobileView[]).map((view) => (
+        <button
+          key={view}
+          onClick={() => {
+            setMobileView(view);
+            if (view === "chat") setChatOpen(true);
+          }}
+          style={{
+            ...theme.mobileNavButton,
+            ...(mobileView === view ? theme.mobileNavButtonActive : {}),
+          }}
+        >
+          {view === "list" ? "Notes" : view === "detail" ? "View" : "Chat"}
+        </button>
+      ))}
+    </div>
+  );
+
+  // --- Layout ---
 
   return (
     <div
@@ -242,14 +443,27 @@ export default function App() {
     >
       {/* Header */}
       <header style={theme.header}>
-        <h1 style={{ margin: 0, fontSize: 18 }}>Obsidian Knowledge</h1>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setChatOpen(!chatOpen)}
-            style={theme.headerButton}
-          >
-            {chatOpen ? "Close Chat" : "Chat"}
-          </button>
+        <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
+          Obsidian Knowledge
+        </h1>
+        {!isMobile && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setChatOpen(!chatOpen)}
+              style={theme.headerButton}
+            >
+              {chatOpen ? "Close Chat" : "Chat"}
+            </button>
+            <button
+              onClick={() => setDark(!dark)}
+              style={theme.headerButton}
+              title="Toggle theme"
+            >
+              {dark ? "Light" : "Dark"}
+            </button>
+          </div>
+        )}
+        {isMobile && (
           <button
             onClick={() => setDark(!dark)}
             style={theme.headerButton}
@@ -257,7 +471,7 @@ export default function App() {
           >
             {dark ? "Light" : "Dark"}
           </button>
-        </div>
+        )}
       </header>
 
       {/* Search bar */}
@@ -265,7 +479,12 @@ export default function App() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleSearch();
+              if (isMobile) setMobileView("list");
+            }
+          }}
           placeholder="Search notes..."
           style={theme.searchInput}
         />
@@ -277,173 +496,36 @@ export default function App() {
           <option value="semantic">Semantic</option>
           <option value="fulltext">Full-text</option>
         </select>
-        <button onClick={handleSearch} style={theme.button}>
+        <button
+          onClick={() => {
+            handleSearch();
+            if (isMobile) setMobileView("list");
+          }}
+          style={theme.button}
+        >
           Search
         </button>
       </div>
 
-      {/* Main content: list + detail + chat */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Left panel: results list */}
-        <div style={theme.listPanel}>
-          {results.map((r) => (
-            <div
-              key={r.path}
-              onClick={() => handleSelect(r.path)}
-              style={{
-                ...theme.listItem,
-                ...(selected?.path === r.path ? theme.listItemSelected : {}),
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{r.title}</div>
-              <div style={{ fontSize: 11, opacity: 0.6 }}>{r.path}</div>
-              {r.tags && r.tags.length > 0 && (
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>
-                  {r.tags.map((t) => `#${t}`).join(" ")}
-                </div>
-              )}
-            </div>
-          ))}
-          {results.length === 0 && (
-            <div style={{ padding: 16, opacity: 0.5, fontSize: 13 }}>
-              No results
-            </div>
-          )}
-        </div>
-
-        {/* Middle panel: note detail */}
-        <div style={theme.detailPanel}>
-          {selected ? (
-            <>
-              <div style={theme.detailHeader}>
-                <h2 style={{ margin: 0, fontSize: 20 }}>{selected.title}</h2>
-                <div style={{ fontSize: 12, opacity: 0.5, marginTop: 4 }}>
-                  {selected.path}
-                  {selected.last_modified &&
-                    ` · ${new Date(selected.last_modified * 1000).toLocaleString()}`}
-                </div>
-                {selected.tags.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 6,
-                      display: "flex",
-                      gap: 4,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {selected.tags.map((t) => (
-                      <span key={t} style={theme.tag}>
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {selected.wikilinks.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 6,
-                      display: "flex",
-                      gap: 4,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {selected.wikilinks.map((link) => (
-                      <span
-                        key={link}
-                        style={theme.wikilink}
-                        onClick={() => handleSelect(`${link}.md`)}
-                      >
-                        [[{link}]]
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div style={theme.markdownBody}>
-                <ReactMarkdown components={mdComponents}>{renderWikilinks(selected.content)}</ReactMarkdown>
-              </div>
-            </>
-          ) : (
-            <div style={{ padding: 32, opacity: 0.4, fontSize: 14 }}>
-              Select a note to view its content
-            </div>
-          )}
-        </div>
-
-        {/* Right panel: chat */}
-        {chatOpen && (
-          <div style={theme.chatPanel}>
-            {/* Model selector + clear */}
-            <div style={theme.chatHeader}>
-              <select
-                value={chatModel}
-                onChange={(e) => setChatModel(e.target.value)}
-                style={{ ...theme.select, flex: 1 }}
-              >
-                <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
-                <option value="claude-opus-4-6">Opus 4.6</option>
-              </select>
-              <button
-                onClick={() => setChatMessages([])}
-                style={theme.headerButton}
-                title="Clear chat"
-              >
-                Clear
-              </button>
-            </div>
-
-            {/* Messages */}
-            <div style={theme.chatMessages}>
-              {chatMessages.length === 0 && (
-                <div style={{ opacity: 0.4, fontSize: 13, padding: 8 }}>
-                  Ask questions about your knowledge base...
-                </div>
-              )}
-              {chatMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  style={
-                    msg.role === "user"
-                      ? theme.chatUserMsg
-                      : theme.chatAssistantMsg
-                  }
-                >
-                  {msg.role === "assistant" ? (
-                    <ReactMarkdown components={mdComponents}>{renderWikilinks(msg.content || "...")}</ReactMarkdown>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
-              ))}
-              {activeTool && (
-                <div style={theme.chatToolIndicator}>
-                  Using tool: {activeTool}...
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Input */}
-            <div style={theme.chatInputArea}>
-              <input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
-                placeholder="Ask about your notes..."
-                style={theme.chatInput}
-                disabled={chatStreaming}
-              />
-              <button
-                onClick={handleChatSend}
-                disabled={chatStreaming}
-                style={theme.button}
-              >
-                Send
-              </button>
-            </div>
+      {/* Main content */}
+      {isMobile ? (
+        // Mobile: single panel at a time
+        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, overflow: "auto" }}>
+            {mobileView === "list" && renderListPanel()}
+            {mobileView === "detail" && renderDetailPanel()}
+            {mobileView === "chat" && renderChatPanel()}
           </div>
-        )}
-      </div>
+          {renderMobileNav()}
+        </div>
+      ) : (
+        // Desktop: multi-column
+        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          {renderListPanel()}
+          {renderDetailPanel()}
+          {chatOpen && renderChatPanel()}
+        </div>
+      )}
     </div>
   );
 }
@@ -488,6 +570,7 @@ const themes = {
       fontSize: 14,
       background: "#fff",
       color: "#1a1a1a",
+      minWidth: 0,
     },
     select: {
       padding: "8px 12px",
@@ -505,7 +588,9 @@ const themes = {
       color: "#fff",
       fontSize: 13,
       cursor: "pointer" as const,
+      whiteSpace: "nowrap" as const,
     },
+    // Desktop panels
     listPanel: {
       width: 280,
       minWidth: 280,
@@ -513,22 +598,66 @@ const themes = {
       overflowY: "auto" as const,
       background: "#fafafa",
     },
-    listItem: {
-      padding: "10px 16px",
-      borderBottom: "1px solid #eee",
-      cursor: "pointer" as const,
-    },
-    listItemSelected: { background: "#ede9fe" },
     detailPanel: {
       flex: 1,
       overflowY: "auto" as const,
       display: "flex" as const,
       flexDirection: "column" as const,
     },
-    detailHeader: {
-      padding: "16px 24px",
-      borderBottom: "1px solid #e0e0e0",
+    chatPanel: {
+      width: 400,
+      minWidth: 400,
+      borderLeft: "1px solid #e0e0e0",
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      background: "#fafafa",
     },
+    // Mobile panels
+    listPanelMobile: {
+      flex: 1,
+      overflowY: "auto" as const,
+      background: "#fafafa",
+    },
+    detailPanelMobile: {
+      flex: 1,
+      overflowY: "auto" as const,
+      display: "flex" as const,
+      flexDirection: "column" as const,
+    },
+    chatPanelMobile: {
+      flex: 1,
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      background: "#fafafa",
+    },
+    // Mobile navigation
+    mobileNav: {
+      display: "flex" as const,
+      borderTop: "1px solid #e0e0e0",
+      background: "#fafafa",
+    },
+    mobileNavButton: {
+      flex: 1,
+      padding: "10px 0",
+      border: "none",
+      background: "transparent",
+      fontSize: 13,
+      fontWeight: 500 as const,
+      cursor: "pointer" as const,
+      color: "#666",
+    },
+    mobileNavButtonActive: {
+      color: "#7c3aed",
+      borderTop: "2px solid #7c3aed",
+    },
+    // Shared
+    listItem: {
+      padding: "10px 16px",
+      borderBottom: "1px solid #eee",
+      cursor: "pointer" as const,
+    },
+    listItemSelected: { background: "#ede9fe" },
+    detailHeader: { padding: "16px 24px", borderBottom: "1px solid #e0e0e0" },
     tag: {
       fontSize: 11,
       padding: "2px 8px",
@@ -549,14 +678,6 @@ const themes = {
       flex: 1,
       lineHeight: 1.7,
       fontSize: 15,
-    },
-    chatPanel: {
-      width: 400,
-      minWidth: 400,
-      borderLeft: "1px solid #e0e0e0",
-      display: "flex" as const,
-      flexDirection: "column" as const,
-      background: "#fafafa",
     },
     chatHeader: {
       display: "flex" as const,
@@ -613,6 +734,7 @@ const themes = {
       fontSize: 14,
       background: "#fff",
       color: "#1a1a1a",
+      minWidth: 0,
     },
   },
   dark: {
@@ -649,6 +771,7 @@ const themes = {
       fontSize: 14,
       background: "#1e1e3a",
       color: "#e0e0e0",
+      minWidth: 0,
     },
     select: {
       padding: "8px 12px",
@@ -666,6 +789,7 @@ const themes = {
       color: "#fff",
       fontSize: 13,
       cursor: "pointer" as const,
+      whiteSpace: "nowrap" as const,
     },
     listPanel: {
       width: 280,
@@ -674,22 +798,63 @@ const themes = {
       overflowY: "auto" as const,
       background: "#16162a",
     },
-    listItem: {
-      padding: "10px 16px",
-      borderBottom: "1px solid #2a2a4a",
-      cursor: "pointer" as const,
-    },
-    listItemSelected: { background: "#2d1b69" },
     detailPanel: {
       flex: 1,
       overflowY: "auto" as const,
       display: "flex" as const,
       flexDirection: "column" as const,
     },
-    detailHeader: {
-      padding: "16px 24px",
-      borderBottom: "1px solid #2a2a4a",
+    chatPanel: {
+      width: 400,
+      minWidth: 400,
+      borderLeft: "1px solid #2a2a4a",
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      background: "#16162a",
     },
+    listPanelMobile: {
+      flex: 1,
+      overflowY: "auto" as const,
+      background: "#16162a",
+    },
+    detailPanelMobile: {
+      flex: 1,
+      overflowY: "auto" as const,
+      display: "flex" as const,
+      flexDirection: "column" as const,
+    },
+    chatPanelMobile: {
+      flex: 1,
+      display: "flex" as const,
+      flexDirection: "column" as const,
+      background: "#16162a",
+    },
+    mobileNav: {
+      display: "flex" as const,
+      borderTop: "1px solid #2a2a4a",
+      background: "#16162a",
+    },
+    mobileNavButton: {
+      flex: 1,
+      padding: "10px 0",
+      border: "none",
+      background: "transparent",
+      fontSize: 13,
+      fontWeight: 500 as const,
+      cursor: "pointer" as const,
+      color: "#888",
+    },
+    mobileNavButtonActive: {
+      color: "#a78bfa",
+      borderTop: "2px solid #a78bfa",
+    },
+    listItem: {
+      padding: "10px 16px",
+      borderBottom: "1px solid #2a2a4a",
+      cursor: "pointer" as const,
+    },
+    listItemSelected: { background: "#2d1b69" },
+    detailHeader: { padding: "16px 24px", borderBottom: "1px solid #2a2a4a" },
     tag: {
       fontSize: 11,
       padding: "2px 8px",
@@ -710,14 +875,6 @@ const themes = {
       flex: 1,
       lineHeight: 1.7,
       fontSize: 15,
-    },
-    chatPanel: {
-      width: 400,
-      minWidth: 400,
-      borderLeft: "1px solid #2a2a4a",
-      display: "flex" as const,
-      flexDirection: "column" as const,
-      background: "#16162a",
     },
     chatHeader: {
       display: "flex" as const,
@@ -774,6 +931,7 @@ const themes = {
       fontSize: 14,
       background: "#1e1e3a",
       color: "#e0e0e0",
+      minWidth: 0,
     },
   },
 };
