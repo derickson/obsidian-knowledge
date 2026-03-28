@@ -37,3 +37,6 @@ select = ["E", "F", "I", "N", "W"]
 asyncio_mode = "auto"
 pythonpath = ["backend"]
 testpaths = ["tests"]
+markers = [
+    "integration: runs against live services (make dev must be running)",
+]

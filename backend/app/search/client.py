@@ -63,11 +63,42 @@ def search_notes(query: str, size: int = 10) -> list[dict]:
 
 
 def semantic_search(query: str, size: int = 10) -> list[dict]:
-    """Semantic search using the Jina embeddings via ES inference."""
+    """Hybrid search: linear fusion of keyword BM25 and semantic vector search."""
     client = get_es_client()
     resp = client.search(
         index=settings.es_index,
-        query={"semantic": {"field": "content_semantic", "query": query}},
+        retriever={
+            "linear": {
+                "retrievers": [
+                    {
+                        "retriever": {
+                            "standard": {
+                                "query": {
+                                    "multi_match": {
+                                        "query": query,
+                                        "fields": ["title^2", "content", "tags^3"],
+                                    }
+                                }
+                            }
+                        },
+                        "weight": 0.3,
+                    },
+                    {
+                        "retriever": {
+                            "standard": {
+                                "query": {
+                                    "semantic": {
+                                        "field": "content_semantic",
+                                        "query": query,
+                                    }
+                                }
+                            }
+                        },
+                        "weight": 0.7,
+                    },
+                ],
+            }
+        },
         size=size,
     )
     return [hit["_source"] | {"score": hit["_score"]} for hit in resp["hits"]["hits"]]

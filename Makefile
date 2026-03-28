@@ -1,4 +1,4 @@
-.PHONY: init up down build redeploy logs dev dev-stop sync reindex test lint
+.PHONY: init up down build redeploy logs dev dev-stop sync reindex test test-integration lint
 
 # --- Setup ---
 
@@ -29,7 +29,7 @@ logs:
 
 dev:
 	@echo "Starting dev servers..."
-	nohup uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 3104 --reload --app-dir obsidian-headless > /tmp/ok-headless.log 2>&1 &
+	VAULT_PATH=$(CURDIR)/vaults/AgentKnowledge nohup uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 3104 --reload --app-dir obsidian-headless > /tmp/ok-headless.log 2>&1 &
 	HEADLESS_URL=http://localhost:3104 nohup uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 3105 --reload --app-dir backend > /tmp/ok-backend.log 2>&1 &
 	cd frontend && nohup npx vite --host 0.0.0.0 --port 8104 > /tmp/ok-frontend.log 2>&1 &
 	@echo "Logs: /tmp/ok-headless.log, /tmp/ok-backend.log, /tmp/ok-frontend.log"
@@ -54,7 +54,10 @@ reindex:
 # --- Testing ---
 
 test:
-	uv run pytest
+	uv run pytest -m "not integration"
+
+test-integration:
+	uv run pytest tests/test_integration.py -v
 
 lint:
 	uv run ruff check backend/ obsidian-headless/ tests/

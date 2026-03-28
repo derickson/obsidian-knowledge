@@ -20,7 +20,7 @@ def index_note(note: dict) -> None:
         "wikilinks": note["wikilinks"],
         "frontmatter": note["metadata"],
         "content_hash": note["content_hash"],
-        "last_modified": note["last_modified"],
+        "last_modified": int(note["last_modified"]),
     }
     es_client.index(index=settings.es_index, id=note["path"], document=doc)
 
@@ -61,7 +61,7 @@ def reindex_all() -> dict:
                 "wikilinks": note["wikilinks"],
                 "frontmatter": note["metadata"],
                 "content_hash": note["content_hash"],
-                "last_modified": note["last_modified"],
+                "last_modified": int(note["last_modified"]),
             },
         })
         indexed += 1

@@ -4,11 +4,12 @@ services:
       context: .
       dockerfile: obsidian-headless/Dockerfile
     ports:
-      - "8100:8100"
+      - "3104:3104"
     volumes:
       - ./vaults:/app/vaults
     env_file:
       - .env
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3104"]
     restart: unless-stopped
 
   backend:
@@ -16,11 +17,14 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "3105:3105"
     volumes:
       - ./backend/app:/app/backend/app
     env_file:
       - .env
+    environment:
+      - HEADLESS_URL=http://obsidian-headless:3104
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3105", "--app-dir", "backend"]
     depends_on:
       - obsidian-headless
     restart: unless-stopped
@@ -28,7 +32,10 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "5173:5173"
+      - "8104:8104"
+    environment:
+      - PORT=8104
+      - BACKEND_URL=http://backend:3105
     volumes:
       - ./frontend/src:/app/src
     depends_on:

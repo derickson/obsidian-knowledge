@@ -12,13 +12,13 @@ graph TD
         REST[REST Clients<br><i>External systems</i>]
     end
 
-    subgraph Backend["Backend · FastAPI + FastMCP · :3105 / :8000"]
+    subgraph Backend["Backend · FastAPI + FastMCP · :3105"]
         API[REST API<br><i>/obsidian-knowledge/api/</i>]
         MCPS[MCP Server<br><i>/obsidian-knowledge/mcp/</i>]
         Pipeline[Post-Processing Pipeline<br><i>index, sync, enrich</i>]
     end
 
-    subgraph Headless["Obsidian Headless · FastAPI · :3104 / :8100"]
+    subgraph Headless["Obsidian Headless · FastAPI · :3104"]
         VaultAPI[Vault CRUD API]
         Sync[ob sync]
     end
@@ -56,11 +56,11 @@ graph TD
 
 ### Services
 
-| Service | Docker | Dev | Role |
-|---------|--------|-----|------|
-| **obsidian-headless** | 8100 | 3104 | Owns the vault filesystem and `ob` CLI. FastAPI service for vault read/write/list/delete and sync. Only container that mounts `vaults/`. |
-| **backend** | 8000 | 3105 | FastAPI + FastMCP. REST API + MCP server for external access. Calls headless for vault I/O, manages ES indexing and post-processing pipeline. |
-| **frontend** | 5173 | 8104 | React/Vite search UI. |
+| Service | Port | Role |
+|---------|------|------|
+| **obsidian-headless** | 3104 | Owns the vault filesystem and `ob` CLI. FastAPI service for vault read/write/list/delete and sync. Only container that mounts `vaults/`. |
+| **backend** | 3105 | FastAPI + FastMCP. REST API + MCP server for external access. Calls headless for vault I/O, manages ES indexing and post-processing pipeline. |
+| **frontend** | 8104 | React/Vite search UI. |
 
 The backend never touches vault files directly — all vault I/O goes through the obsidian-headless service via HTTP.
 
@@ -92,6 +92,17 @@ ob sync-status --path vaults/AgentKnowledge
 ```
 
 After setup, `ob sync` will push and pull changes between this server and Obsidian cloud. The backend triggers `ob sync` automatically after note creation via the API.
+
+To periodically pull changes made on other devices, add a cron job:
+
+```bash
+# Run every 5 minutes — edit the path to match your install
+crontab -e
+```
+
+```
+*/5 * * * * cd /home/dave/dev/obsidian-knowledge && ob sync --path vaults/AgentKnowledge >> /tmp/ok-obsidian-sync.log 2>&1
+```
 
 ### Environment
 

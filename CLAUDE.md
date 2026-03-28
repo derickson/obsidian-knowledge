@@ -55,7 +55,8 @@ ob sync              # Sync vault with Obsidian cloud
 make sync            # Trigger sync via headless service
 
 # Testing & linting
-make test            # Run pytest
+make test            # Run unit tests (excludes integration)
+make test-integration # Run integration tests (requires make dev)
 make lint            # Run ruff
 uv run pytest tests/test_vault_reader.py -v  # Run a single test file
 uv run pytest -k test_read_existing_note     # Run a single test by name

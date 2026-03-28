@@ -19,5 +19,5 @@ RUN uv sync --no-dev
 
 COPY obsidian-headless/app/ app/
 
-EXPOSE 8100
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100"]
+EXPOSE 3104
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3104"]

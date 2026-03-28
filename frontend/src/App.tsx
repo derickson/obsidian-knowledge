@@ -13,7 +13,7 @@ interface SearchResult {
 export default function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [mode, setMode] = useState<"fulltext" | "semantic">("fulltext");
+  const [mode, setMode] = useState<"fulltext" | "semantic">("semantic");
 
   const handleSearch = async () => {
     if (!query.trim()) return;
