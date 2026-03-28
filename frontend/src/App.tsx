@@ -10,7 +10,7 @@ const WIKILINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 function renderWikilinks(text: string): string {
   return text.replace(WIKILINK_RE, (_match, target, alias) => {
     const display = alias || target;
-    return `[${display}](wikilink:${encodeURIComponent(target)})`;
+    return `[${display}](/wikilink/${encodeURIComponent(target)})`;
   });
 }
 
@@ -223,12 +223,11 @@ export default function App() {
       children,
       ...props
     }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-      // Check for wikilink: prefix (may be encoded or decoded by react-markdown)
-      const wikilinkTarget = href?.startsWith("wikilink:")
-        ? decodeURIComponent(href.slice(9))
-        : href?.startsWith("wikilink%3A")
-          ? decodeURIComponent(href.slice(11))
-          : null;
+      // Check for /wikilink/ path prefix
+      const wikiPrefix = "/wikilink/";
+      const wikilinkTarget = href?.startsWith(wikiPrefix)
+        ? decodeURIComponent(href.slice(wikiPrefix.length))
+        : null;
 
       if (wikilinkTarget) {
         return (
