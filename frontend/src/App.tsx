@@ -805,6 +805,7 @@ export default function App() {
                         <th style={{ padding: "8px 12px" }}>ID</th>
                         <th style={{ padding: "8px 12px" }}>ES Index</th>
                         <th style={{ padding: "8px 12px" }}>Sync</th>
+                        <th style={{ padding: "8px 12px" }}>Read-Only</th>
                         <th style={{ padding: "8px 12px" }}>Default</th>
                         <th style={{ padding: "8px 12px" }}>Actions</th>
                       </tr>
@@ -816,6 +817,7 @@ export default function App() {
                           <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 12 }}>{id}</td>
                           <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 12 }}>{v.es_index}</td>
                           <td style={{ padding: "8px 12px" }}>{v.sync_enabled ? "✓" : "✗"}</td>
+                          <td style={{ padding: "8px 12px" }}>{v.read_only ? "🔒" : ""}</td>
                           <td style={{ padding: "8px 12px" }}>{v.default ? "★" : ""}</td>
                           <td style={{ padding: "8px 12px" }}>
                             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -896,6 +898,7 @@ export default function App() {
                             es_index: fd.get("es_index") as string,
                             default: fd.get("default") === "on",
                             sync_enabled: fd.get("sync_enabled") === "on",
+                            read_only: fd.get("read_only") === "on",
                           };
                           await fetch(`${VAULTS_API}${editingVault}/`, {
                             method: "PUT",
@@ -920,6 +923,9 @@ export default function App() {
                           <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
                             <label style={{ fontSize: 13 }}>
                               <input type="checkbox" name="default" defaultChecked={v.default} /> Default
+                            </label>
+                            <label style={{ fontSize: 13 }}>
+                              <input type="checkbox" name="read_only" defaultChecked={v.read_only} /> Read-Only
                             </label>
                             <label style={{ fontSize: 13 }}>
                               <input type="checkbox" name="sync_enabled" defaultChecked={v.sync_enabled} /> Sync Enabled

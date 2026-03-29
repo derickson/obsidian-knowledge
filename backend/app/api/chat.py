@@ -15,6 +15,7 @@ from app.search.indexer import delete_from_index, index_note, reindex_all
 from app.sync import run_ob_sync
 from app.vault.reader import list_notes, read_note
 from app.vault.writer import delete_note, write_note
+from app.vaults import VaultReadOnlyError, check_writable, get_vault
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,7 @@ async def execute_tool(name: str, tool_input: dict, vault_id: str | None = None)
                     list_notes, tool_input.get("folder"), vault_id=vault_id
                 )
             case "create":
+                check_writable(vault_id)
                 await asyncio.to_thread(
                     write_note, tool_input["path"], tool_input["content"],
                     tool_input.get("metadata"), vault_id=vault_id,
@@ -185,6 +187,7 @@ async def execute_tool(name: str, tool_input: dict, vault_id: str | None = None)
                 await run_ob_sync(vault_id=vault_id)
                 result = {"status": "created", "path": tool_input["path"]}
             case "delete":
+                check_writable(vault_id)
                 await asyncio.to_thread(
                     delete_note, tool_input["path"], vault_id=vault_id
                 )
@@ -217,7 +220,11 @@ def build_system_prompt(
     now = datetime.now(tz).strftime("%A, %Y-%m-%d %H:%M %Z")
     prompt = f"Current date and time: {now}\n\n" + SYSTEM_INSTRUCTIONS
     if vault_id:
-        prompt += f"\nYou are currently working in the **{vault_id}** vault.\n"
+        vc = get_vault(vault_id)
+        prompt += f"\nYou are currently working in the **{vault_id}** vault"
+        if vc.read_only:
+            prompt += " (READ-ONLY — you cannot create, update, or delete notes in this vault)"
+        prompt += ".\n"
     if focused_note_path:
         try:
             note = read_note(focused_note_path, vault_id=vault_id)

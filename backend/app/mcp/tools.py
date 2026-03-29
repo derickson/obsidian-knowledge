@@ -6,7 +6,7 @@ from app.search.indexer import delete_from_index, index_note, reindex_all
 from app.sync import run_ob_sync
 from app.vault.reader import list_notes, read_note
 from app.vault.writer import delete_note, write_note
-from app.vaults import list_vaults as _list_vaults
+from app.vaults import VaultReadOnlyError, check_writable, list_vaults as _list_vaults
 
 mcp_auth = None
 if settings.mcp_api_key:
@@ -30,7 +30,11 @@ Notes are markdown files with YAML frontmatter for metadata and [[wikilinks]] fo
 
 This server manages multiple Obsidian vaults. All tools accept an optional `vault` parameter
 (vault ID string). If omitted, the default vault is used. Use `list_vaults` to discover
-available vaults.
+available vaults and their capabilities.
+
+Some vaults are **read-only** — they accept changes only via Obsidian Sync, not through
+this server. Attempting to create, update, or delete notes in a read-only vault will return
+a clear error. Check the `read_only` field in `list_vaults` output before writing.
 
 ## Vault organization
 
@@ -107,6 +111,7 @@ async def create(
         metadata: Optional frontmatter metadata (tags, source, etc.)
         vault: Vault ID (optional, defaults to the default vault)
     """
+    check_writable(vault)
     write_note(path, content, metadata, vault_id=vault)
     note = read_note(path, vault_id=vault)
     index_note(note, vault_id=vault)
@@ -122,6 +127,7 @@ async def delete(path: str, vault: str | None = None) -> dict:
         path: Path of the note to delete (e.g., "People/Old Note.md")
         vault: Vault ID (optional, defaults to the default vault)
     """
+    check_writable(vault)
     delete_note(path, vault_id=vault)
     delete_from_index(path, vault_id=vault)
     await run_ob_sync(vault_id=vault)

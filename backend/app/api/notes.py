@@ -6,6 +6,7 @@ from app.search.client import recent_notes, search_notes, semantic_search
 from app.search.indexer import delete_from_index
 from app.vault.reader import list_notes, read_note
 from app.vault.writer import write_note, delete_note
+from app.vaults import VaultReadOnlyError, check_writable
 
 router = APIRouter()
 
@@ -26,6 +27,10 @@ async def create_note(
     note: NoteCreate, background_tasks: BackgroundTasks, vault: str | None = None
 ):
     """Create or update a note. Indexes to ES and syncs in the background."""
+    try:
+        check_writable(vault)
+    except VaultReadOnlyError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     write_note(note.path, note.content, note.metadata, vault_id=vault)
     background_tasks.add_task(process_note, note.path, vault_id=vault)
     return {"status": "created", "path": note.path}
@@ -67,6 +72,10 @@ async def get_note(path: str, vault: str | None = None):
 @router.delete("/{path:path}")
 async def remove_note(path: str, vault: str | None = None):
     """Delete a note from the vault."""
+    try:
+        check_writable(vault)
+    except VaultReadOnlyError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     try:
         read_note(path, vault_id=vault)
     except FileNotFoundError:

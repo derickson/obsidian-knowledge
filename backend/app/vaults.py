@@ -15,6 +15,26 @@ class VaultConfig(BaseModel):
     es_index: str
     default: bool = False
     sync_enabled: bool = True
+    read_only: bool = False
+
+
+class VaultReadOnlyError(Exception):
+    """Raised when a write operation is attempted on a read-only vault."""
+
+    def __init__(self, vault_id: str | None = None):
+        self.vault_id = vault_id
+        super().__init__(
+            f"Vault '{vault_id or 'default'}' is read-only. "
+            "Write operations (create, update, delete) are not allowed. "
+            "This vault only accepts changes via Obsidian Sync."
+        )
+
+
+def check_writable(vault_id: str | None = None) -> None:
+    """Raise VaultReadOnlyError if the vault is read-only."""
+    vc = get_vault(vault_id)
+    if vc.read_only:
+        raise VaultReadOnlyError(vault_id)
 
 
 def load_vaults() -> dict[str, VaultConfig]:
