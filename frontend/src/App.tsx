@@ -70,7 +70,7 @@ export default function App() {
   const [editingVault, setEditingVault] = useState<string | null>(null);
   const [vaultActionStatus, setVaultActionStatus] = useState<Record<string, string>>({});
   const [setupVault, setSetupVault] = useState<any | null>(null);
-  const [setupForm, setSetupForm] = useState({ localPath: "", password: "", vaultId: "", esIndex: "" });
+  const [setupForm, setSetupForm] = useState({ localPath: "", password: "", vaultId: "", esIndex: "", readOnly: false });
   const [setupStatus, setSetupStatus] = useState<string>("");
   const [chatOpen, setChatOpen] = useState(window.innerWidth >= 768);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -1046,6 +1046,15 @@ export default function App() {
                           style={{ ...theme.searchInput, width: "100%" }}
                         />
                       </div>
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={setupForm.readOnly}
+                            onChange={(e) => setSetupForm({ ...setupForm, readOnly: e.target.checked })}
+                          /> Read-Only (prevent writes from UI, API, and MCP — only Obsidian Sync can modify)
+                        </label>
+                      </div>
                       {setupStatus && (
                         <div style={{
                           padding: "8px 12px", marginBottom: 12, borderRadius: 6, fontSize: 13,
@@ -1075,6 +1084,7 @@ export default function App() {
                                   sync_path: setupForm.localPath,
                                   es_index: setupForm.esIndex,
                                   password: setupForm.password,
+                                  read_only: setupForm.readOnly,
                                   create_remote: false,
                                 }),
                               });

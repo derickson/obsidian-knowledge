@@ -30,6 +30,7 @@ class VaultSetup(BaseModel):
     sync_path: str
     es_index: str
     password: str
+    read_only: bool = False
     create_remote: bool = False
 
 
@@ -98,6 +99,7 @@ async def api_setup_vault(request: VaultSetup):
         es_index=request.es_index,
         default=False,
         sync_enabled=True,
+        read_only=request.read_only,
     )
     save_vault(request.vault_id, config)
 
