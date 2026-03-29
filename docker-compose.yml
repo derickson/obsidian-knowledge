@@ -26,7 +26,7 @@ services:
       - "3105:3105"
     volumes:
       - ./backend/app:/app/backend/app
-      - ./vaults.json:/app/vaults.json:ro
+      - ./vaults.json:/app/vaults.json
     env_file:
       - .env
     environment:
