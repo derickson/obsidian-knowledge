@@ -84,8 +84,9 @@ async def _setup_background(job_id: str, vault_id: str, vault_path: str):
             files_synced=await _get_file_count(vault_path),
         )
     except Exception as e:
-        logger.error("Setup background task failed for %s: %s", vault_id, e)
-        job.update(status="error", step="Failed", error=str(e))
+        error_msg = str(e) or f"{type(e).__name__}: {repr(e)}"
+        logger.error("Setup background task failed for %s: %s", vault_id, error_msg)
+        job.update(status="error", step="Failed", error=error_msg)
 
 
 @router.get("/")
