@@ -1,6 +1,7 @@
 from elasticsearch import Elasticsearch
 
 from app.config import settings
+from app.vaults import get_vault
 
 _es_client: Elasticsearch | None = None
 
@@ -23,14 +24,19 @@ class _ESProxy:
 es_client = _ESProxy()
 
 
-def ensure_index():
+def _index_name(vault_id: str | None = None) -> str:
+    return get_vault(vault_id).es_index
+
+
+def ensure_index(vault_id: str | None = None):
     """Create the index with mappings if it doesn't exist."""
+    index = _index_name(vault_id)
     client = get_es_client()
-    if client.indices.exists(index=settings.es_index):
+    if client.indices.exists(index=index):
         return
 
     client.indices.create(
-        index=settings.es_index,
+        index=index,
         mappings={
             "properties": {
                 "path": {"type": "keyword"},
@@ -51,34 +57,40 @@ def ensure_index():
     )
 
 
-def recent_notes(size: int = 20) -> list[dict]:
+def recent_notes(size: int = 20, vault_id: str | None = None) -> list[dict]:
     """Return the most recently modified notes."""
+    index = _index_name(vault_id)
     client = get_es_client()
-    resp = client.search(
-        index=settings.es_index,
-        query={"match_all": {}},
-        sort=[{"last_modified": {"order": "desc"}}],
-        size=size,
-    )
-    return [hit["_source"] for hit in resp["hits"]["hits"]]
+    try:
+        resp = client.search(
+            index=index,
+            query={"match_all": {}},
+            sort=[{"last_modified": {"order": "desc"}}],
+            size=size,
+        )
+        return [hit["_source"] for hit in resp["hits"]["hits"]]
+    except Exception:
+        return []
 
 
-def search_notes(query: str, size: int = 10) -> list[dict]:
+def search_notes(query: str, size: int = 10, vault_id: str | None = None) -> list[dict]:
     """Full-text search across notes."""
+    index = _index_name(vault_id)
     client = get_es_client()
     resp = client.search(
-        index=settings.es_index,
+        index=index,
         query={"multi_match": {"query": query, "fields": ["title^2", "content", "tags^3"]}},
         size=size,
     )
     return [hit["_source"] | {"score": hit["_score"]} for hit in resp["hits"]["hits"]]
 
 
-def semantic_search(query: str, size: int = 10) -> list[dict]:
+def semantic_search(query: str, size: int = 10, vault_id: str | None = None) -> list[dict]:
     """Hybrid search: linear fusion of keyword BM25 and semantic vector search."""
+    index = _index_name(vault_id)
     client = get_es_client()
     resp = client.search(
-        index=settings.es_index,
+        index=index,
         retriever={
             "linear": {
                 "retrievers": [

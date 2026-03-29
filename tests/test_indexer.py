@@ -21,7 +21,7 @@ class TestReindexAll:
         """New files (not in ES) should be read and indexed."""
         mock_es.search.return_value = {"hits": {"hits": []}}
 
-        def read_side_effect(path):
+        def read_side_effect(path, **kwargs):
             return {**SAMPLE_NOTE, "path": path, "title": path}
 
         mock_headless["read_note"].side_effect = read_side_effect

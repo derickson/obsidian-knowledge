@@ -1,0 +1,30 @@
+{
+  "vaults": {
+    "AgentKnowledge": {
+      "name": "Agent Knowledge",
+      "path": "/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge",
+      "sync_path": "/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge",
+      "es_index": "obsidian-knowledge-agentknowledge",
+      "default": true,
+      "sync_enabled": true
+    },
+    "ObsidianCloudHome": {
+      "name": "ObsidianCloudHome",
+      "path": "/home/dave/dev/obsidian-knowledge/vaults/ObsidianCloudHome",
+      "sync_path": "/home/dave/dev/obsidian-knowledge/vaults/ObsidianCloudHome",
+      "es_index": "obsidian-knowledge-obsidiancloudhome",
+      "default": false,
+      "sync_enabled": true,
+      "read_only": true
+    },
+    "ObsidianCloudElastic": {
+      "name": "ObsidianCloudElastic",
+      "path": "/home/dave/dev/obsidian-knowledge/vaults/ObsidianCloudElastic",
+      "sync_path": "/home/dave/dev/obsidian-knowledge/vaults/ObsidianCloudElastic",
+      "es_index": "obsidian-knowledge-obsidiancloudelastic",
+      "default": false,
+      "sync_enabled": true,
+      "read_only": false
+    }
+  }
+}

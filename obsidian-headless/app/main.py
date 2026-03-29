@@ -2,7 +2,14 @@ from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.sync import run_ob_sync
+from app.sync import (
+    create_remote_vault,
+    list_local_vaults,
+    list_remote_vaults,
+    run_ob_sync,
+    setup_sync,
+    sync_status,
+)
 from app.vault.reader import list_notes, read_note, vault_path
 from app.vault.writer import delete_note, write_note
 
@@ -19,53 +26,104 @@ class NoteWrite(BaseModel):
 
 
 @app.get("/notes/")
-async def api_list_notes(folder: str | None = None):
+async def api_list_notes(folder: str | None = None, vault: str | None = None):
     """List all notes in the vault."""
-    base = vault_path()
-    return {"notes": [str(p.relative_to(base)) for p in list_notes(folder)]}
+    base = vault_path(vault)
+    return {"notes": [str(p.relative_to(base)) for p in list_notes(folder, vault)]}
+
+
+@app.get("/notes/count/")
+async def api_note_count(vault: str | None = None):
+    """Fast file count for progress tracking."""
+    return {"count": len(list_notes(vault=vault))}
 
 
 @app.get("/notes/manifest/")
-async def api_manifest():
+async def api_manifest(vault: str | None = None):
     """Return path and mtime for all notes (lightweight, no content reading)."""
-    base = vault_path()
+    base = vault_path(vault)
     manifest = []
-    for p in list_notes():
+    for p in list_notes(vault=vault):
         rel = str(p.relative_to(base))
         manifest.append({"path": rel, "last_modified": int(p.stat().st_mtime)})
     return {"notes": manifest}
 
 
 @app.get("/notes/{path:path}")
-async def api_read_note(path: str):
+async def api_read_note(path: str, vault: str | None = None):
     """Read a note from the vault."""
     try:
-        return read_note(path)
+        return read_note(path, vault)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Note not found: {path}")
 
 
 @app.post("/notes/")
-async def api_write_note(note: NoteWrite):
+async def api_write_note(note: NoteWrite, vault: str | None = None):
     """Write a note to the vault."""
-    write_note(note.path, note.content, note.metadata)
-    return read_note(note.path)
+    write_note(note.path, note.content, note.metadata, vault)
+    return read_note(note.path, vault)
 
 
 @app.delete("/notes/{path:path}")
-async def api_delete_note(path: str):
+async def api_delete_note(path: str, vault: str | None = None):
     """Delete a note from the vault."""
     try:
-        read_note(path)
+        read_note(path, vault)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Note not found: {path}")
-    delete_note(path)
+    delete_note(path, vault)
     return {"status": "deleted", "path": path}
 
 
 @app.post("/sync/")
-async def api_sync():
+async def api_sync(sync_path: str | None = None):
     """Trigger ob sync."""
-    result = await run_ob_sync()
+    result = await run_ob_sync(sync_path)
     status = "ok" if result["returncode"] == 0 else "error"
     return {"status": status, **result}
+
+
+@app.get("/sync/list-remote/")
+async def api_list_remote():
+    """List available remote Obsidian vaults."""
+    return {"vaults": await list_remote_vaults()}
+
+
+@app.get("/sync/list-local/")
+async def api_list_local():
+    """List locally configured vault syncs."""
+    return {"vaults": await list_local_vaults()}
+
+
+class CreateRemoteRequest(BaseModel):
+    name: str
+    password: str
+
+
+class SetupSyncRequest(BaseModel):
+    vault_name: str
+    local_path: str
+    password: str
+
+
+@app.post("/sync/create-remote/")
+async def api_create_remote(request: CreateRemoteRequest):
+    """Create a new remote Obsidian vault with e2ee."""
+    result = await create_remote_vault(request.name, request.password)
+    status = "ok" if result["returncode"] == 0 else "error"
+    return {"status": status, **result}
+
+
+@app.post("/sync/setup/")
+async def api_setup_sync(request: SetupSyncRequest):
+    """Set up sync from a local path to a remote vault."""
+    result = await setup_sync(request.vault_name, request.local_path, request.password)
+    status = "ok" if result["returncode"] == 0 else "error"
+    return {"status": status, **result}
+
+
+@app.get("/sync/status/")
+async def api_sync_status(path: str):
+    """Get sync status for a vault path."""
+    return await sync_status(path)

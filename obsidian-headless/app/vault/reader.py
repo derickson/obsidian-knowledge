@@ -9,21 +9,21 @@ from app.config import settings
 WIKILINK_PATTERN = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 
 
-def vault_path() -> Path:
-    return Path(settings.vault_path)
+def vault_path(override: str | None = None) -> Path:
+    return Path(override) if override else Path(settings.vault_path)
 
 
-def list_notes(folder: str | None = None) -> list[Path]:
+def list_notes(folder: str | None = None, vault: str | None = None) -> list[Path]:
     """List all markdown files in the vault, optionally filtered by folder."""
-    base = vault_path()
+    base = vault_path(vault)
     if folder:
         base = base / folder
     return sorted(base.rglob("*.md"))
 
 
-def read_note(path: str) -> dict:
+def read_note(path: str, vault: str | None = None) -> dict:
     """Read a note and return parsed content, frontmatter, and metadata."""
-    full_path = vault_path() / path
+    full_path = vault_path(vault) / path
     if not full_path.is_file():
         raise FileNotFoundError(f"Note not found: {path}")
 

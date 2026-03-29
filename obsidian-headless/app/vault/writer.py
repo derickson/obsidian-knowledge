@@ -1,17 +1,11 @@
-from pathlib import Path
-
 import frontmatter
 
-from app.config import settings
+from app.vault.reader import vault_path
 
 
-def vault_path() -> Path:
-    return Path(settings.vault_path)
-
-
-def write_note(path: str, content: str, metadata: dict | None = None) -> Path:
+def write_note(path: str, content: str, metadata: dict | None = None, vault: str | None = None):
     """Write a markdown note to the vault with optional frontmatter metadata."""
-    full_path = vault_path() / path
+    full_path = vault_path(vault) / path
     full_path.parent.mkdir(parents=True, exist_ok=True)
 
     post = frontmatter.Post(content, **(metadata or {}))
@@ -19,8 +13,8 @@ def write_note(path: str, content: str, metadata: dict | None = None) -> Path:
     return full_path
 
 
-def delete_note(path: str) -> None:
+def delete_note(path: str, vault: str | None = None) -> None:
     """Delete a note from the vault."""
-    full_path = vault_path() / path
+    full_path = vault_path(vault) / path
     if full_path.is_file():
         full_path.unlink()

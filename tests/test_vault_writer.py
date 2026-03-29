@@ -21,13 +21,19 @@ _headless_config = _import_headless("app/config.py", "headless_config")
 _settings = _headless_config.settings
 
 _orig_config = sys.modules.get("app.config")
+_orig_vault_reader = sys.modules.get("app.vault.reader")
 sys.modules["app.config"] = _headless_config
 _reader = _import_headless("app/vault/reader.py", "headless_reader")
+sys.modules["app.vault.reader"] = _reader
 _writer = _import_headless("app/vault/writer.py", "headless_writer")
 if _orig_config:
     sys.modules["app.config"] = _orig_config
 else:
     del sys.modules["app.config"]
+if _orig_vault_reader:
+    sys.modules["app.vault.reader"] = _orig_vault_reader
+else:
+    del sys.modules["app.vault.reader"]
 
 
 def _with_vault(fn, vault_dir, *args, **kwargs):

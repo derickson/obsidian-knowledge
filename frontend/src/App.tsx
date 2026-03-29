@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 declare const __API_PREFIX__: string;
 const API = `${__API_PREFIX__}/api/notes/`;
 const CHAT_API = `${__API_PREFIX__}/api/chat/`;
+const VAULTS_API = `${__API_PREFIX__}/api/vaults/`;
 
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
@@ -58,9 +59,19 @@ export default function App() {
   );
   const [mobileView, setMobileView] = useState<MobileView>("list");
 
+  const [vaults, setVaults] = useState<Record<string, { name: string; default?: boolean }>>({});
+  const [currentVault, setCurrentVault] = useState<string>("AgentKnowledge");
   const [existingNotes, setExistingNotes] = useState<Set<string>>(new Set());
 
   const [showInfo, setShowInfo] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<string>("vaults");
+  const [remoteVaults, setRemoteVaults] = useState<any[]>([]);
+  const [editingVault, setEditingVault] = useState<string | null>(null);
+  const [vaultActionStatus, setVaultActionStatus] = useState<Record<string, string>>({});
+  const [setupVault, setSetupVault] = useState<any | null>(null);
+  const [setupForm, setSetupForm] = useState({ localPath: "", password: "", vaultId: "", esIndex: "", readOnly: false });
+  const [setupStatus, setSetupStatus] = useState<string>("");
   const [chatOpen, setChatOpen] = useState(window.innerWidth >= 768);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -72,20 +83,44 @@ export default function App() {
 
   const isMobile = useIsMobile();
 
+  const vaultParam = (extra?: Record<string, string>) => {
+    const params = new URLSearchParams({ vault: currentVault, ...extra });
+    return `?${params}`;
+  };
+
   const refreshNoteList = () => {
-    fetch(`${API}list/`)
+    fetch(`${API}list/${vaultParam()}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.notes && setExistingNotes(new Set(d.notes)))
       .catch(() => {});
   };
 
+  // Fetch vaults on mount
   useEffect(() => {
-    fetch(`${API}recent/?size=20`)
+    fetch(VAULTS_API)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.vaults) {
+          setVaults(d.vaults);
+          const def = Object.entries(d.vaults).find(
+            ([, v]: [string, any]) => v.default,
+          );
+          if (def) setCurrentVault(def[0]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load notes when vault changes
+  useEffect(() => {
+    setSelected(null);
+    setResults([]);
+    fetch(`${API}recent/${vaultParam({ size: "20" })}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.results && setResults(d.results))
       .catch(() => {});
     refreshNoteList();
-  }, []);
+  }, [currentVault]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -100,12 +135,12 @@ export default function App() {
 
   const handleSearch = async () => {
     if (!query.trim()) {
-      const resp = await fetch(`${API}recent/?size=20`);
+      const resp = await fetch(`${API}recent/${vaultParam({ size: "20" })}`);
       const data = await resp.json();
       if (data?.results) setResults(data.results);
       return;
     }
-    const endpoint = `${API}semantic-search/`;
+    const endpoint = `${API}semantic-search/${vaultParam()}`;
     const resp = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -116,7 +151,7 @@ export default function App() {
   };
 
   const handleSelect = async (path: string) => {
-    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
+    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}${vaultParam()}`);
     if (resp.ok) {
       setSelected(await resp.json());
       if (isMobile) setMobileView("detail");
@@ -147,6 +182,7 @@ export default function App() {
           model: chatModel,
           focused_note_path: selected?.path || null,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          vault: currentVault,
         }),
       });
 
@@ -202,7 +238,7 @@ export default function App() {
               if (selected?.path) {
                 handleSelect(selected.path).catch(() => setSelected(null));
               }
-              fetch(`${API}recent/?size=20`)
+              fetch(`${API}recent/${vaultParam({ size: "20" })}`)
                 .then((r) => (r.ok ? r.json() : null))
                 .then((d) => d?.results && setResults(d.results))
                 .catch(() => {});
@@ -310,7 +346,7 @@ export default function App() {
     const path = `Observations/${dateStr}-Daily.md`;
 
     // Try to read it first
-    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
+    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}${vaultParam()}`);
     if (resp.ok) {
       setSelected(await resp.json());
       if (isMobile) setMobileView("detail");
@@ -319,7 +355,7 @@ export default function App() {
 
     // Create it
     const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
-    await fetch(API, {
+    await fetch(`${API}${vaultParam()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -334,14 +370,14 @@ export default function App() {
     });
 
     // Now read and select it
-    const readResp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
+    const readResp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}${vaultParam()}`);
     if (readResp.ok) {
       setSelected(await readResp.json());
       if (isMobile) setMobileView("detail");
     }
 
     // Refresh the list
-    fetch(`${API}recent/?size=20`)
+    fetch(`${API}recent/${vaultParam({ size: "20" })}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.results && setResults(d.results))
       .catch(() => {});
@@ -560,12 +596,28 @@ export default function App() {
     >
       {/* Header */}
       <header style={theme.header}>
-        <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
-          Obsidian Knowledge
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
+            Obsidian Knowledge
+          </h1>
+          {Object.keys(vaults).length > 1 && (
+            <select
+              value={currentVault}
+              onChange={(e) => setCurrentVault(e.target.value)}
+              style={{ ...theme.select, fontSize: 12, padding: "4px 8px" }}
+            >
+              {Object.entries(vaults).map(([id, v]: [string, any]) => (
+                <option key={id} value={id}>{v.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={handleToday} style={theme.iconButton} title="Today's observations">
             📅
+          </button>
+          <button onClick={() => setShowSettings(true)} style={theme.iconButton} title="Settings">
+            ⚙️
           </button>
           <button onClick={() => setShowInfo(true)} style={theme.iconButton} title="Connection info">
             ℹ️
@@ -677,6 +729,412 @@ export default function App() {
               <h3>REST API</h3>
               <code style={theme.codeBlock}>{window.location.origin}{__API_PREFIX__}/api/notes/</code>
               <p style={{ fontSize: 12, opacity: 0.6 }}>Protected by HTTP Basic Auth when accessed through nginx.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings overlay */}
+      {showSettings && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000,
+          background: theme.root.background, color: theme.root.color,
+          display: "flex", flexDirection: "column",
+        }}>
+          {/* Settings header */}
+          <div style={{
+            ...theme.header, display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Settings</h2>
+            <button onClick={() => { setShowSettings(false); setEditingVault(null); }} style={theme.headerButton}>
+              Close
+            </button>
+          </div>
+
+          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+            {/* Left nav */}
+            <div style={{
+              width: isMobile ? "100%" : 200, minWidth: isMobile ? undefined : 200,
+              borderRight: isMobile ? "none" : `1px solid ${dark ? "#2a2a4a" : "#e0e0e0"}`,
+              padding: "8px 0",
+              background: dark ? "#16162a" : "#fafafa",
+              ...(isMobile && settingsSection ? { display: "none" } : {}),
+            }}>
+              {[{ id: "vaults", label: "Vaults" }].map((sec) => (
+                <div
+                  key={sec.id}
+                  onClick={() => setSettingsSection(sec.id)}
+                  style={{
+                    padding: "10px 20px", cursor: "pointer", fontSize: 14, fontWeight: 500,
+                    background: settingsSection === sec.id ? (dark ? "#2d1b69" : "#ede9fe") : "transparent",
+                    borderLeft: settingsSection === sec.id ? "3px solid #7c3aed" : "3px solid transparent",
+                  }}
+                >
+                  {sec.label}
+                </div>
+              ))}
+            </div>
+
+            {/* Settings content */}
+            <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+              {settingsSection === "vaults" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h3 style={{ margin: 0 }}>Configured Vaults</h3>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={async () => {
+                          const resp = await fetch(`${VAULTS_API}remote/`);
+                          if (resp.ok) {
+                            const d = await resp.json();
+                            setRemoteVaults(d.vaults || []);
+                          }
+                        }}
+                        style={theme.button}
+                      >
+                        Browse Remote Vaults
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Vault table */}
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, marginBottom: 24 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${dark ? "#2a2a4a" : "#e0e0e0"}`, textAlign: "left" }}>
+                        <th style={{ padding: "8px 12px" }}>Name</th>
+                        <th style={{ padding: "8px 12px" }}>ID</th>
+                        <th style={{ padding: "8px 12px" }}>ES Index</th>
+                        <th style={{ padding: "8px 12px" }}>Sync</th>
+                        <th style={{ padding: "8px 12px" }}>Read-Only</th>
+                        <th style={{ padding: "8px 12px" }}>Default</th>
+                        <th style={{ padding: "8px 12px" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(vaults).map(([id, v]: [string, any]) => (
+                        <tr key={id} style={{ borderBottom: `1px solid ${dark ? "#2a2a4a" : "#eee"}` }}>
+                          <td style={{ padding: "8px 12px" }}>{v.name}</td>
+                          <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 12 }}>{id}</td>
+                          <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 12 }}>{v.es_index}</td>
+                          <td style={{ padding: "8px 12px" }}>{v.sync_enabled ? "✓" : "✗"}</td>
+                          <td style={{ padding: "8px 12px" }}>{v.read_only ? "🔒" : ""}</td>
+                          <td style={{ padding: "8px 12px" }}>{v.default ? "★" : ""}</td>
+                          <td style={{ padding: "8px 12px" }}>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              <button
+                                onClick={async () => {
+                                  setVaultActionStatus((s) => ({ ...s, [id]: "syncing..." }));
+                                  const r = await fetch(`${VAULTS_API}${id}/sync/`, { method: "POST" });
+                                  const d = await r.json();
+                                  setVaultActionStatus((s) => ({ ...s, [id]: d.status === "ok" ? "synced" : "error" }));
+                                  setTimeout(() => setVaultActionStatus((s) => ({ ...s, [id]: "" })), 3000);
+                                }}
+                                style={{ ...theme.headerButton, fontSize: 11, padding: "2px 8px" }}
+                              >
+                                Sync
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setVaultActionStatus((s) => ({ ...s, [id]: "reindexing..." }));
+                                  const r = await fetch(`${VAULTS_API}${id}/reindex/`, { method: "POST" });
+                                  const d = await r.json();
+                                  setVaultActionStatus((s) => ({ ...s, [id]: `indexed: ${d.indexed}, skipped: ${d.skipped}` }));
+                                  setTimeout(() => setVaultActionStatus((s) => ({ ...s, [id]: "" })), 5000);
+                                }}
+                                style={{ ...theme.headerButton, fontSize: 11, padding: "2px 8px" }}
+                              >
+                                Reindex
+                              </button>
+                              <button
+                                onClick={() => setEditingVault(editingVault === id ? null : id)}
+                                style={{ ...theme.headerButton, fontSize: 11, padding: "2px 8px" }}
+                              >
+                                Edit
+                              </button>
+                              {!v.default && (
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`Remove vault "${v.name}"? (Files are not deleted)`)) {
+                                      await fetch(`${VAULTS_API}${id}/`, { method: "DELETE" });
+                                      const resp = await fetch(VAULTS_API);
+                                      if (resp.ok) {
+                                        const d = await resp.json();
+                                        setVaults(d.vaults);
+                                      }
+                                    }
+                                  }}
+                                  style={{ ...theme.headerButton, fontSize: 11, padding: "2px 8px", color: "#ef4444" }}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                            {vaultActionStatus[id] && (
+                              <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>{vaultActionStatus[id]}</div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Edit vault form */}
+                  {editingVault && vaults[editingVault] && (() => {
+                    const v = vaults[editingVault] as any;
+                    return (
+                      <div style={{
+                        padding: 16, marginBottom: 24,
+                        border: `1px solid ${dark ? "#2a2a4a" : "#e0e0e0"}`,
+                        borderRadius: 8, background: dark ? "#1e1e3a" : "#f9f9f9",
+                      }}>
+                        <h4 style={{ margin: "0 0 12px" }}>Edit: {editingVault}</h4>
+                        <form onSubmit={async (e) => {
+                          e.preventDefault();
+                          const fd = new FormData(e.target as HTMLFormElement);
+                          const config = {
+                            name: fd.get("name") as string,
+                            path: fd.get("path") as string,
+                            sync_path: fd.get("sync_path") as string,
+                            es_index: fd.get("es_index") as string,
+                            default: fd.get("default") === "on",
+                            sync_enabled: fd.get("sync_enabled") === "on",
+                            read_only: fd.get("read_only") === "on",
+                          };
+                          await fetch(`${VAULTS_API}${editingVault}/`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(config),
+                          });
+                          setEditingVault(null);
+                          const resp = await fetch(VAULTS_API);
+                          if (resp.ok) setVaults((await resp.json()).vaults);
+                        }}>
+                          {[
+                            { label: "Name", name: "name", value: v.name },
+                            { label: "Path", name: "path", value: v.path },
+                            { label: "Sync Path", name: "sync_path", value: v.sync_path },
+                            { label: "ES Index", name: "es_index", value: v.es_index },
+                          ].map((f) => (
+                            <div key={f.name} style={{ marginBottom: 8 }}>
+                              <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>{f.label}</label>
+                              <input name={f.name} defaultValue={f.value} style={{ ...theme.searchInput, width: "100%" }} />
+                            </div>
+                          ))}
+                          <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
+                            <label style={{ fontSize: 13 }}>
+                              <input type="checkbox" name="default" defaultChecked={v.default} /> Default
+                            </label>
+                            <label style={{ fontSize: 13 }}>
+                              <input type="checkbox" name="read_only" defaultChecked={v.read_only} /> Read-Only
+                            </label>
+                            <label style={{ fontSize: 13 }}>
+                              <input type="checkbox" name="sync_enabled" defaultChecked={v.sync_enabled} /> Sync Enabled
+                            </label>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button type="submit" style={theme.button}>Save</button>
+                            <button type="button" onClick={() => setEditingVault(null)} style={theme.headerButton}>Cancel</button>
+                          </div>
+                        </form>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Remote vaults browser */}
+                  {remoteVaults.length > 0 && (
+                    <div>
+                      <h3 style={{ marginBottom: 12 }}>Remote Obsidian Vaults</h3>
+                      <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>
+                        These are vaults available in your Obsidian Sync account. Select one to set up local sync.
+                      </p>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                        <thead>
+                          <tr style={{ borderBottom: `2px solid ${dark ? "#2a2a4a" : "#e0e0e0"}`, textAlign: "left" }}>
+                            <th style={{ padding: "8px 12px" }}>Name</th>
+                            <th style={{ padding: "8px 12px" }}>Region</th>
+                            <th style={{ padding: "8px 12px" }}>Status</th>
+                            <th style={{ padding: "8px 12px" }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {remoteVaults.map((rv: any) => {
+                            const alreadyConfigured = Object.values(vaults).some(
+                              (v: any) => v.name === rv.name || v.name === rv.name.replace(/([A-Z])/g, " $1").trim()
+                            );
+                            return (
+                              <tr key={rv.id} style={{ borderBottom: `1px solid ${dark ? "#2a2a4a" : "#eee"}` }}>
+                                <td style={{ padding: "8px 12px" }}>{rv.name}</td>
+                                <td style={{ padding: "8px 12px" }}>{rv.region}</td>
+                                <td style={{ padding: "8px 12px" }}>
+                                  {alreadyConfigured ? (
+                                    <span style={{ color: "#22c55e" }}>Configured</span>
+                                  ) : (
+                                    <span style={{ opacity: 0.5 }}>Not configured</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: "8px 12px" }}>
+                                  {!alreadyConfigured && (
+                                    <button
+                                      onClick={() => {
+                                        const vaultId = rv.name.replace(/\s+/g, "");
+                                        setSetupVault(rv);
+                                        setSetupForm({
+                                          localPath: `/home/dave/dev/obsidian-knowledge/vaults/${vaultId}`,
+                                          password: "",
+                                          vaultId,
+                                          esIndex: `obsidian-knowledge-${vaultId.toLowerCase()}`,
+                                        });
+                                        setSetupStatus("");
+                                      }}
+                                      style={{ ...theme.headerButton, fontSize: 11, padding: "2px 8px" }}
+                                    >
+                                      Set Up
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Setup vault dialog */}
+                  {setupVault && (
+                    <div style={{
+                      padding: 20, marginTop: 16,
+                      border: `2px solid #7c3aed`,
+                      borderRadius: 8, background: dark ? "#1e1e3a" : "#f9f9f9",
+                    }}>
+                      <h4 style={{ margin: "0 0 4px" }}>Set Up Vault: {setupVault.name}</h4>
+                      <p style={{ fontSize: 13, opacity: 0.6, margin: "0 0 16px" }}>
+                        This will create the local directory, link it to the remote vault,
+                        run an initial sync, and index into Elasticsearch.
+                      </p>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>Vault ID</label>
+                        <input
+                          value={setupForm.vaultId}
+                          onChange={(e) => setSetupForm({ ...setupForm, vaultId: e.target.value })}
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>Local Directory</label>
+                        <input
+                          value={setupForm.localPath}
+                          onChange={(e) => setSetupForm({ ...setupForm, localPath: e.target.value })}
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>Encryption Password (e2ee)</label>
+                        <input
+                          type="password"
+                          value={setupForm.password}
+                          onChange={(e) => setSetupForm({ ...setupForm, password: e.target.value })}
+                          placeholder="Enter the vault's encryption password"
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>ES Index Name</label>
+                        <input
+                          value={setupForm.esIndex}
+                          onChange={(e) => setSetupForm({ ...setupForm, esIndex: e.target.value })}
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={setupForm.readOnly}
+                            onChange={(e) => setSetupForm({ ...setupForm, readOnly: e.target.checked })}
+                          /> Read-Only (prevent writes from UI, API, and MCP — only Obsidian Sync can modify)
+                        </label>
+                      </div>
+                      {setupStatus && (
+                        <div style={{
+                          padding: "8px 12px", marginBottom: 12, borderRadius: 6, fontSize: 13,
+                          background: setupStatus.startsWith("Error") ? "#fef2f2" : (dark ? "#1a2e1a" : "#f0fdf4"),
+                          color: setupStatus.startsWith("Error") ? "#dc2626" : "#16a34a",
+                        }}>
+                          {setupStatus}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={async () => {
+                            if (!setupForm.password) {
+                              setSetupStatus("Error: Encryption password is required");
+                              return;
+                            }
+                            setSetupStatus("Linking to remote vault...");
+                            try {
+                              const resp = await fetch(`${VAULTS_API}setup/`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  vault_id: setupForm.vaultId,
+                                  name: setupVault.name,
+                                  remote_vault_name: setupVault.name,
+                                  local_path: setupForm.localPath,
+                                  sync_path: setupForm.localPath,
+                                  es_index: setupForm.esIndex,
+                                  password: setupForm.password,
+                                  read_only: setupForm.readOnly,
+                                  create_remote: false,
+                                }),
+                              });
+                              const d = await resp.json();
+                              if (d.status === "started" && d.job_id) {
+                                // Poll for progress
+                                const pollInterval = setInterval(async () => {
+                                  try {
+                                    const sr = await fetch(`${VAULTS_API}setup/status/${d.job_id}/`);
+                                    const s = await sr.json();
+                                    const files = s.files_synced ? ` (${s.files_synced.toLocaleString()} files)` : "";
+                                    setSetupStatus(`${s.step}${files}`);
+                                    if (s.status === "completed") {
+                                      clearInterval(pollInterval);
+                                      const indexed = s.reindex?.indexed || 0;
+                                      setSetupStatus(`Done! Indexed ${indexed} notes.`);
+                                      const vr = await fetch(VAULTS_API);
+                                      if (vr.ok) setVaults((await vr.json()).vaults);
+                                      setTimeout(() => { setSetupVault(null); setSetupStatus(""); }, 3000);
+                                    } else if (s.status === "error") {
+                                      clearInterval(pollInterval);
+                                      setSetupStatus(`Error: ${s.error}`);
+                                    }
+                                  } catch {
+                                    // Polling failed, keep trying
+                                  }
+                                }, 2000);
+                              } else if (d.status === "error") {
+                                setSetupStatus(`Error at ${d.step || "unknown"}: ${d.stderr || d.stdout || JSON.stringify(d)}`);
+                              }
+                            } catch (e) {
+                              setSetupStatus(`Error: ${e}`);
+                            }
+                          }}
+                          style={theme.button}
+                          disabled={setupStatus !== "" && !setupStatus.startsWith("Error")}
+                        >
+                          {setupStatus && !setupStatus.startsWith("Error") ? "Setting up..." : "Set Up Vault"}
+                        </button>
+                        <button
+                          onClick={() => { setSetupVault(null); setSetupStatus(""); }}
+                          style={theme.headerButton}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

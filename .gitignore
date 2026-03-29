@@ -12,8 +12,8 @@ frontend/dist/
 # Environment
 .env
 
-# Obsidian vault contents (vault is synced via `ob sync`, not git)
-vaults/AgentKnowledge/
+# Obsidian vault contents (vaults are synced via `ob sync`, not git)
+vaults/*/
 
 # Docker
 docker-compose.override.yml
