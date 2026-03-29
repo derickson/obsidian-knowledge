@@ -32,6 +32,12 @@ async def api_list_notes(folder: str | None = None, vault: str | None = None):
     return {"notes": [str(p.relative_to(base)) for p in list_notes(folder, vault)]}
 
 
+@app.get("/notes/count/")
+async def api_note_count(vault: str | None = None):
+    """Fast file count for progress tracking."""
+    return {"count": len(list_notes(vault=vault))}
+
+
 @app.get("/notes/manifest/")
 async def api_manifest(vault: str | None = None):
     """Return path and mtime for all notes (lightweight, no content reading)."""

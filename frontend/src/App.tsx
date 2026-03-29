@@ -1071,7 +1071,7 @@ export default function App() {
                               setSetupStatus("Error: Encryption password is required");
                               return;
                             }
-                            setSetupStatus("Setting up vault...");
+                            setSetupStatus("Linking to remote vault...");
                             try {
                               const resp = await fetch(`${VAULTS_API}setup/`, {
                                 method: "POST",
@@ -1089,12 +1089,30 @@ export default function App() {
                                 }),
                               });
                               const d = await resp.json();
-                              if (d.status === "ok") {
-                                setSetupStatus(`Done! Synced and indexed ${d.reindex?.indexed || 0} notes.`);
-                                const vr = await fetch(VAULTS_API);
-                                if (vr.ok) setVaults((await vr.json()).vaults);
-                                setTimeout(() => { setSetupVault(null); setSetupStatus(""); }, 2000);
-                              } else {
+                              if (d.status === "started" && d.job_id) {
+                                // Poll for progress
+                                const pollInterval = setInterval(async () => {
+                                  try {
+                                    const sr = await fetch(`${VAULTS_API}setup/status/${d.job_id}/`);
+                                    const s = await sr.json();
+                                    const files = s.files_synced ? ` (${s.files_synced.toLocaleString()} files)` : "";
+                                    setSetupStatus(`${s.step}${files}`);
+                                    if (s.status === "completed") {
+                                      clearInterval(pollInterval);
+                                      const indexed = s.reindex?.indexed || 0;
+                                      setSetupStatus(`Done! Indexed ${indexed} notes.`);
+                                      const vr = await fetch(VAULTS_API);
+                                      if (vr.ok) setVaults((await vr.json()).vaults);
+                                      setTimeout(() => { setSetupVault(null); setSetupStatus(""); }, 3000);
+                                    } else if (s.status === "error") {
+                                      clearInterval(pollInterval);
+                                      setSetupStatus(`Error: ${s.error}`);
+                                    }
+                                  } catch {
+                                    // Polling failed, keep trying
+                                  }
+                                }, 2000);
+                              } else if (d.status === "error") {
                                 setSetupStatus(`Error at ${d.step || "unknown"}: ${d.stderr || d.stdout || JSON.stringify(d)}`);
                               }
                             } catch (e) {
@@ -1102,9 +1120,9 @@ export default function App() {
                             }
                           }}
                           style={theme.button}
-                          disabled={setupStatus === "Setting up vault..."}
+                          disabled={setupStatus !== "" && !setupStatus.startsWith("Error")}
                         >
-                          {setupStatus === "Setting up vault..." ? "Setting up..." : "Set Up Vault"}
+                          {setupStatus && !setupStatus.startsWith("Error") ? "Setting up..." : "Set Up Vault"}
                         </button>
                         <button
                           onClick={() => { setSetupVault(null); setSetupStatus(""); }}
