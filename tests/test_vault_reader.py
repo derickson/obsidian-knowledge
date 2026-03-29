@@ -127,3 +127,60 @@ class TestListNotes:
 
     def test_empty_vault(self, vault_dir):
         assert _list_notes(vault_dir) == []
+
+
+def _scan_structure(vault_dir, **kwargs):
+    orig = _settings.vault_path
+    _settings.vault_path = str(vault_dir)
+    try:
+        return _reader.scan_structure(**kwargs)
+    finally:
+        _settings.vault_path = orig
+
+
+class TestScanStructure:
+    def test_basic_structure(self, vault_dir, sample_notes):
+        result = _scan_structure(vault_dir)
+        assert result["name"] == "root"
+        folder_names = [f["name"] for f in result["folders"]]
+        assert "Inbox" in folder_names
+        assert result["file_count"] == 1  # note-a.md at root
+
+    def test_subfolder_files(self, vault_dir, sample_notes):
+        result = _scan_structure(vault_dir)
+        inbox = next(f for f in result["folders"] if f["name"] == "Inbox")
+        assert inbox["file_count"] == 2
+        assert "note-b.md" in inbox["files"]
+        assert "note-c.md" in inbox["files"]
+
+    def test_skips_hidden_dirs(self, vault_dir):
+        (vault_dir / ".obsidian").mkdir()
+        (vault_dir / ".obsidian" / "config.json").write_text("{}")
+        (vault_dir / "visible.md").write_text("# Visible")
+        result = _scan_structure(vault_dir)
+        folder_names = [f["name"] for f in result["folders"]]
+        assert ".obsidian" not in folder_names
+
+    def test_empty_vault(self, vault_dir):
+        result = _scan_structure(vault_dir)
+        assert result["folders"] == []
+        assert result["files"] == []
+        assert result["file_count"] == 0
+
+    def test_respects_max_depth(self, vault_dir):
+        deep = vault_dir / "level1" / "level2" / "level3"
+        deep.mkdir(parents=True)
+        (deep / "deep.md").write_text("# Deep")
+        (vault_dir / "level1" / "shallow.md").write_text("# Shallow")
+        result = _scan_structure(vault_dir, max_depth=2)
+        level1 = next(f for f in result["folders"] if f["name"] == "level1")
+        level2 = next(f for f in level1["folders"] if f["name"] == "level2")
+        # level3 should not appear (max_depth=2, and level2 is already depth 2)
+        assert level2["folders"] == []
+
+    def test_files_per_folder_limit(self, vault_dir):
+        for i in range(15):
+            (vault_dir / f"note-{i:02d}.md").write_text(f"# Note {i}")
+        result = _scan_structure(vault_dir, files_per_folder=5)
+        assert len(result["files"]) == 5
+        assert result["file_count"] == 15

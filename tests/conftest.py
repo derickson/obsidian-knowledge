@@ -42,6 +42,8 @@ TEST_VAULT = VaultConfig(
     es_index="test-index",
     default=True,
     sync_enabled=False,
+    instructions="## Test vault layout\n\n- **Inbox/**: test notes",
+    daily_note_format="Observations/{YYYY}-{MM}-{DD}-Daily.md",
 )
 
 

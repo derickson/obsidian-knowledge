@@ -10,7 +10,7 @@ from app.sync import (
     setup_sync,
     sync_status,
 )
-from app.vault.reader import list_notes, read_note, vault_path
+from app.vault.reader import list_notes, read_note, scan_structure, vault_path
 from app.vault.writer import delete_note, write_note
 
 app = FastAPI(title="Obsidian Headless", version="0.1.0")
@@ -36,6 +36,14 @@ async def api_list_notes(folder: str | None = None, vault: str | None = None):
 async def api_note_count(vault: str | None = None):
     """Fast file count for progress tracking."""
     return {"count": len(list_notes(vault=vault))}
+
+
+@app.get("/notes/structure/")
+async def api_vault_structure(
+    vault: str | None = None, max_depth: int = 2, files_per_folder: int = 10,
+):
+    """Return folder tree with sample filenames for vault structure discovery."""
+    return {"structure": scan_structure(vault, max_depth, files_per_folder)}
 
 
 @app.get("/notes/manifest/")

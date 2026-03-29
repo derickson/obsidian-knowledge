@@ -31,6 +31,15 @@ def list_manifest(vault_id: str | None = None) -> list[dict]:
         return resp.json()["notes"]
 
 
+def get_vault_structure(vault_id: str | None = None) -> dict:
+    """Get vault folder structure via headless service."""
+    vc = get_vault(vault_id)
+    with _client() as client:
+        resp = client.get("/notes/structure/", params={"vault": vc.path})
+        resp.raise_for_status()
+        return resp.json()["structure"]
+
+
 def read_note(path: str, vault_id: str | None = None) -> dict:
     """Read a note via headless service."""
     vc = get_vault(vault_id)

@@ -44,6 +44,36 @@ def read_note(path: str, vault: str | None = None) -> dict:
     }
 
 
+def scan_structure(
+    vault: str | None = None, max_depth: int = 2, files_per_folder: int = 10,
+) -> dict:
+    """Walk vault directory and return folder tree with sample filenames."""
+    base = vault_path(vault)
+
+    def _scan(directory: Path, depth: int) -> dict:
+        folders = []
+        md_files = []
+        try:
+            entries = sorted(directory.iterdir(), key=lambda p: p.name)
+        except PermissionError:
+            entries = []
+        for entry in entries:
+            if entry.name.startswith("."):
+                continue
+            if entry.is_dir() and depth < max_depth:
+                folders.append(_scan(entry, depth + 1))
+            elif entry.is_file() and entry.suffix == ".md":
+                md_files.append(entry.name)
+        return {
+            "name": directory.name if directory != base else "root",
+            "folders": folders,
+            "files": md_files[:files_per_folder],
+            "file_count": len(md_files),
+        }
+
+    return _scan(base, 0)
+
+
 def extract_wikilinks(content: str) -> list[str]:
     """Extract [[wikilink]] targets from markdown content."""
     return WIKILINK_PATTERN.findall(content)

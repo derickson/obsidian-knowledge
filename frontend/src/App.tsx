@@ -338,12 +338,15 @@ export default function App() {
   };
 
   const handleToday = async () => {
+    const v = vaults[currentVault] as any;
+    const fmt = v?.daily_note_format;
+    if (!fmt) return;
     const now = new Date();
-    const yyyy = now.getFullYear();
+    const yyyy = String(now.getFullYear());
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
     const dateStr = `${yyyy}-${mm}-${dd}`;
-    const path = `Observations/${dateStr}-Daily.md`;
+    const path = fmt.replace("{YYYY}", yyyy).replace("{MM}", mm).replace("{DD}", dd);
 
     // Try to read it first
     const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}${vaultParam()}`);
@@ -613,9 +616,11 @@ export default function App() {
           )}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={handleToday} style={theme.iconButton} title="Today's observations">
-            📅
-          </button>
+          {(vaults[currentVault] as any)?.daily_note_format && (
+            <button onClick={handleToday} style={theme.iconButton} title="Today's observations">
+              📅
+            </button>
+          )}
           <button onClick={() => setShowSettings(true)} style={theme.iconButton} title="Settings">
             ⚙️
           </button>
@@ -899,6 +904,8 @@ export default function App() {
                             default: fd.get("default") === "on",
                             sync_enabled: fd.get("sync_enabled") === "on",
                             read_only: fd.get("read_only") === "on",
+                            daily_note_format: fd.get("daily_note_format") as string,
+                            instructions: fd.get("instructions") as string,
                           };
                           await fetch(`${VAULTS_API}${editingVault}/`, {
                             method: "PUT",
@@ -930,6 +937,29 @@ export default function App() {
                             <label style={{ fontSize: 13 }}>
                               <input type="checkbox" name="sync_enabled" defaultChecked={v.sync_enabled} /> Sync Enabled
                             </label>
+                          </div>
+                          <div style={{ marginBottom: 8 }}>
+                            <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>Daily Note Format</label>
+                            <input name="daily_note_format" defaultValue={v.daily_note_format || ""} placeholder="Observations/{YYYY}-{MM}-{DD}-Daily.md" style={{ ...theme.searchInput, width: "100%" }} />
+                          </div>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                              <label style={{ fontSize: 12 }}>Vault Instructions</label>
+                              <button type="button" onClick={async () => {
+                                if (!confirm("This will replace the current instructions with auto-generated content based on the vault's folder structure. Continue?")) return;
+                                const resp = await fetch(`${VAULTS_API}${editingVault}/instructions/generate/`, { method: "POST" });
+                                if (resp.ok) {
+                                  const data = await resp.json();
+                                  const ta = document.querySelector('textarea[name="instructions"]') as HTMLTextAreaElement;
+                                  if (ta) ta.value = data.instructions;
+                                  if (data.suggested_daily_note_format) {
+                                    const inp = document.querySelector('input[name="daily_note_format"]') as HTMLInputElement;
+                                    if (inp) inp.value = data.suggested_daily_note_format;
+                                  }
+                                }
+                              }} style={{ ...theme.headerButton, fontSize: 11, padding: "2px 8px" }}>Re-generate Instructions</button>
+                            </div>
+                            <textarea name="instructions" defaultValue={v.instructions || ""} rows={10} style={{ ...theme.searchInput, width: "100%", minHeight: 200, fontFamily: "monospace", fontSize: 12, resize: "vertical" }} />
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button type="submit" style={theme.button}>Save</button>
