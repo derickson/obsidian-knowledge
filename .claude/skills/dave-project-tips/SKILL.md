@@ -44,6 +44,13 @@ These are Dave's established conventions for projects hosted on his Ubuntu serve
 - **Package**: `elastic-apm` with Starlette middleware
 - **Per-service names**: `make_apm_client({"SERVICE_NAME": "project-name-service"})` — each service gets a distinct name in the APM UI
 - **Env vars**: `ELASTIC_APM_SERVER_URL`, `ELASTIC_APM_SECRET_TOKEN`, `ELASTIC_APM_API_KEY`, `ELASTIC_APM_ENVIRONMENT` — the APM agent reads these automatically, no need to put them in pydantic Settings
+- **LLM call instrumentation**: All Anthropic API calls must be wrapped with `elasticapm.capture_span()` and labeled with token usage. This is how Dave tracks LLM costs and performance in Kibana.
+  - **Span convention**: `elasticapm.capture_span(f"Anthropic {model}", span_type="external", span_subtype="anthropic", span_action="chat", labels={"model": model, "max_tokens": max_tokens})`
+  - **Token labels**: After the response (or after `get_final_message()` for streams), call `elasticapm.label(input_tokens=usage.input_tokens, output_tokens=usage.output_tokens)`
+  - **Sync calls**: Wrap `client.messages.create()` in a `capture_span` context manager, label tokens from `response.usage`
+  - **Streaming calls**: Wrap the entire `client.messages.stream()` block (including `get_final_message()`) inside `capture_span`, add `streaming=True` to span labels, label tokens after the stream completes
+  - **Tool-use loops**: When the LLM is called in a loop (e.g., agentic tool use), each iteration gets its own span so per-call token usage is visible
+  - **Queryable in Kibana**: Filter spans by `span.subtype: "anthropic"`, token data available as `labels.input_tokens` and `labels.output_tokens`
 
 ## Frontend (Vite + React)
 
