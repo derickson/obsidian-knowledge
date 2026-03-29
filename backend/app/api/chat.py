@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import anthropic
+import elasticapm
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -256,25 +257,38 @@ async def chat(request: ChatRequest):
         while True:
             collected_content = []
 
-            async with client.messages.stream(
-                model=request.model,
-                max_tokens=8192,
-                system=system_prompt,
-                messages=messages,
-                tools=TOOLS,
-            ) as stream:
-                async for event in stream:
-                    if event.type == "content_block_start":
-                        block = event.content_block
-                        if block.type == "tool_use":
-                            yield f"data: {json.dumps({'type': 'tool_use_start', 'name': block.name, 'id': block.id})}\n\n"
-                    elif event.type == "content_block_delta":
-                        delta = event.delta
-                        if hasattr(delta, "text"):
-                            yield f"data: {json.dumps({'type': 'text', 'content': delta.text})}\n\n"
+            with elasticapm.capture_span(
+                f"Anthropic {request.model}",
+                span_type="external",
+                span_subtype="anthropic",
+                span_action="chat",
+                labels={"model": request.model, "max_tokens": 8192, "streaming": True},
+            ):
+                async with client.messages.stream(
+                    model=request.model,
+                    max_tokens=8192,
+                    system=system_prompt,
+                    messages=messages,
+                    tools=TOOLS,
+                ) as stream:
+                    async for event in stream:
+                        if event.type == "content_block_start":
+                            block = event.content_block
+                            if block.type == "tool_use":
+                                yield f"data: {json.dumps({'type': 'tool_use_start', 'name': block.name, 'id': block.id})}\n\n"
+                        elif event.type == "content_block_delta":
+                            delta = event.delta
+                            if hasattr(delta, "text"):
+                                yield f"data: {json.dumps({'type': 'text', 'content': delta.text})}\n\n"
 
-                final_message = await stream.get_final_message()
-                collected_content = final_message.content
+                    final_message = await stream.get_final_message()
+                    collected_content = final_message.content
+
+                    if final_message.usage:
+                        elasticapm.label(
+                            input_tokens=final_message.usage.input_tokens,
+                            output_tokens=final_message.usage.output_tokens,
+                        )
 
             if final_message.stop_reason == "tool_use":
                 messages.append({"role": "assistant", "content": collected_content})
