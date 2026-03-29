@@ -25,7 +25,7 @@ async def _run_ob(*args: str, timeout: int = 30) -> dict:
 async def run_ob_sync(sync_path: str | None = None) -> dict:
     """Run `ob sync` to sync vault with Obsidian cloud."""
     path = sync_path or settings.vault_sync_path or settings.vault_path
-    result = await _run_ob("sync", "--path", path, timeout=120)
+    result = await _run_ob("sync", "--path", path, timeout=300)
     if result["returncode"] != 0:
         logger.error("ob sync failed: %s", result["stderr"])
     else:

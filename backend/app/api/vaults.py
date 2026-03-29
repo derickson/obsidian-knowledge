@@ -13,8 +13,8 @@ from app.vaults import VaultConfig, delete_vault, get_vault, list_vaults, save_v
 router = APIRouter()
 
 
-def _headless_client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(base_url=settings.headless_url, timeout=60)
+def _headless_client(timeout: int = 60) -> httpx.AsyncClient:
+    return httpx.AsyncClient(base_url=settings.headless_url, timeout=timeout)
 
 
 class VaultCreate(BaseModel):
@@ -64,7 +64,7 @@ async def api_setup_vault(request: VaultSetup):
     # 1. Create local directory if it doesn't exist
     os.makedirs(request.local_path, exist_ok=True)
 
-    async with _headless_client() as client:
+    async with _headless_client(timeout=600) as client:
         # 2. Create remote vault if requested
         if request.create_remote:
             resp = await client.post(
