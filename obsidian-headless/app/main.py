@@ -2,7 +2,14 @@ from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.sync import run_ob_sync
+from app.sync import (
+    create_remote_vault,
+    list_local_vaults,
+    list_remote_vaults,
+    run_ob_sync,
+    setup_sync,
+    sync_status,
+)
 from app.vault.reader import list_notes, read_note, vault_path
 from app.vault.writer import delete_note, write_note
 
@@ -69,3 +76,37 @@ async def api_sync(sync_path: str | None = None):
     result = await run_ob_sync(sync_path)
     status = "ok" if result["returncode"] == 0 else "error"
     return {"status": status, **result}
+
+
+@app.get("/sync/list-remote/")
+async def api_list_remote():
+    """List available remote Obsidian vaults."""
+    return {"vaults": await list_remote_vaults()}
+
+
+@app.get("/sync/list-local/")
+async def api_list_local():
+    """List locally configured vault syncs."""
+    return {"vaults": await list_local_vaults()}
+
+
+@app.post("/sync/create-remote/")
+async def api_create_remote(name: str):
+    """Create a new remote Obsidian vault."""
+    result = await create_remote_vault(name)
+    status = "ok" if result["returncode"] == 0 else "error"
+    return {"status": status, **result}
+
+
+@app.post("/sync/setup/")
+async def api_setup_sync(vault_name: str, local_path: str):
+    """Set up sync from a local path to a remote vault."""
+    result = await setup_sync(vault_name, local_path)
+    status = "ok" if result["returncode"] == 0 else "error"
+    return {"status": status, **result}
+
+
+@app.get("/sync/status/")
+async def api_sync_status(path: str):
+    """Get sync status for a vault path."""
+    return await sync_status(path)

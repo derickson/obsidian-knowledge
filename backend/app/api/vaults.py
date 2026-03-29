@@ -1,9 +1,17 @@
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.config import settings
+from app.search.indexer import reindex_all
+from app.sync import run_ob_sync
 from app.vaults import VaultConfig, delete_vault, get_vault, list_vaults, save_vault
 
 router = APIRouter()
+
+
+def _headless_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(base_url=settings.headless_url, timeout=60)
 
 
 class VaultCreate(BaseModel):
@@ -11,11 +19,129 @@ class VaultCreate(BaseModel):
     config: VaultConfig
 
 
+class VaultSetup(BaseModel):
+    vault_id: str
+    name: str
+    remote_vault_name: str
+    local_path: str
+    sync_path: str
+    es_index: str
+    create_remote: bool = False
+
+
 @router.get("/")
 async def api_list_vaults():
     """List all configured vaults."""
     vaults = list_vaults()
     return {"vaults": {k: v.model_dump() for k, v in vaults.items()}}
+
+
+@router.get("/remote/")
+async def api_list_remote():
+    """List available remote Obsidian vaults."""
+    async with _headless_client() as client:
+        resp = await client.get("/sync/list-remote/")
+        resp.raise_for_status()
+        return resp.json()
+
+
+@router.get("/local/")
+async def api_list_local():
+    """List locally configured vault syncs."""
+    async with _headless_client() as client:
+        resp = await client.get("/sync/list-local/")
+        resp.raise_for_status()
+        return resp.json()
+
+
+@router.post("/setup/")
+async def api_setup_vault(request: VaultSetup):
+    """Set up a new vault: optionally create remote, run sync-setup, register in config."""
+    async with _headless_client() as client:
+        # Create remote vault if requested
+        if request.create_remote:
+            resp = await client.post(
+                "/sync/create-remote/",
+                params={"name": request.remote_vault_name},
+            )
+            if resp.status_code != 200 or resp.json().get("status") != "ok":
+                return {"status": "error", "step": "create-remote", **resp.json()}
+
+        # Set up sync
+        resp = await client.post(
+            "/sync/setup/",
+            params={"vault_name": request.remote_vault_name, "local_path": request.local_path},
+        )
+        if resp.status_code != 200 or resp.json().get("status") != "ok":
+            return {"status": "error", "step": "sync-setup", **resp.json()}
+
+    # Register in vaults.json
+    config = VaultConfig(
+        name=request.name,
+        path=request.local_path,
+        sync_path=request.sync_path or request.local_path,
+        es_index=request.es_index,
+        default=False,
+        sync_enabled=True,
+    )
+    save_vault(request.vault_id, config)
+
+    return {"status": "ok", "vault_id": request.vault_id}
+
+
+@router.post("/")
+async def api_create_vault(request: VaultCreate):
+    """Register a new vault (manual config, no sync setup)."""
+    save_vault(request.vault_id, request.config)
+    return {"status": "created", "vault_id": request.vault_id}
+
+
+# Per-vault action routes — must come before /{vault_id}/ catch-all
+
+@router.get("/{vault_id}/status/")
+async def api_vault_status(vault_id: str):
+    """Get sync status for a vault."""
+    try:
+        vc = get_vault(vault_id)
+    except ValueError:
+        raise HTTPException(404, f"Vault not found: {vault_id}")
+    async with _headless_client() as client:
+        resp = await client.get("/sync/status/", params={"path": vc.sync_path or vc.path})
+        resp.raise_for_status()
+        return resp.json()
+
+
+@router.post("/{vault_id}/sync/")
+async def api_vault_sync(vault_id: str):
+    """Trigger sync for a specific vault."""
+    try:
+        get_vault(vault_id)
+    except ValueError:
+        raise HTTPException(404, f"Vault not found: {vault_id}")
+    result = await run_ob_sync(vault_id=vault_id)
+    return {"status": "ok" if result.get("returncode") == 0 else "error", **result}
+
+
+@router.post("/{vault_id}/reindex/")
+async def api_vault_reindex(vault_id: str):
+    """Trigger ES reindex for a specific vault."""
+    try:
+        get_vault(vault_id)
+    except ValueError:
+        raise HTTPException(404, f"Vault not found: {vault_id}")
+    result = reindex_all(vault_id=vault_id)
+    return {"status": "ok", **result}
+
+
+@router.put("/{vault_id}/")
+async def api_update_vault(vault_id: str, config: VaultConfig):
+    """Update a vault's configuration."""
+    try:
+        get_vault(vault_id)
+    except ValueError:
+        raise HTTPException(404, f"Vault not found: {vault_id}")
+    save_vault(vault_id, config)
+    return {"status": "updated", "vault_id": vault_id}
 
 
 @router.get("/{vault_id}/")
@@ -26,13 +152,6 @@ async def api_get_vault(vault_id: str):
         return vc.model_dump()
     except ValueError:
         raise HTTPException(404, f"Vault not found: {vault_id}")
-
-
-@router.post("/")
-async def api_create_vault(request: VaultCreate):
-    """Register a new vault."""
-    save_vault(request.vault_id, request.config)
-    return {"status": "created", "vault_id": request.vault_id}
 
 
 @router.delete("/{vault_id}/")
