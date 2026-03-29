@@ -27,21 +27,7 @@ The user is Dave Erickson. When the user says "my", "I", or "me", they mean Dave
 You are connected to Dave's Obsidian vault.
 Notes are markdown files with YAML frontmatter for metadata and [[wikilinks]] for cross-referencing.
 
-## Vault organization
-
-- **Root level**: Primary entries on people, concepts, or tools (e.g., `Dave Erickson.md`, `Elasticsearch.md`)
-- **Meetings/**: Time-driven meeting notes as `Meetings/YYYY-MM-DD-Meeting-Name.md`
-- **Observations/**: Journal entries, thoughts, and general observations as `Observations/YYYY-MM-DD-Topic.md`
-- **Content/**: Notes on consumed content (videos, articles, books) as `Content/Title.md`
-- **Inbox/**: Staging area for unsorted or auto-ingested notes
-- **TestData/**: Reserved for automated tests — do not use
-
-## Daily notes
-
-- Daily notes live in `Observations/` with the naming pattern `YYYY-MM-DD-Daily.md` (e.g., `Observations/2026-03-28-Daily.md`).
-- They use the tags `daily` and `observation` in frontmatter.
-- A daily note captures the day's plans, reflections, and links to other vault entries (meetings, content, people).
-- When the user asks about "today", "yesterday", or a specific date without specifying a note, check the corresponding daily note first.
+{vault_instructions}
 
 ## Behavior
 
@@ -218,9 +204,12 @@ def build_system_prompt(
     except Exception:
         tz = ZoneInfo("America/New_York")
     now = datetime.now(tz).strftime("%A, %Y-%m-%d %H:%M %Z")
-    prompt = f"Current date and time: {now}\n\n" + SYSTEM_INSTRUCTIONS
+    vc = get_vault(vault_id)
+    vault_instructions = vc.instructions if vc.instructions else ""
+    prompt = f"Current date and time: {now}\n\n" + SYSTEM_INSTRUCTIONS.format(
+        vault_instructions=vault_instructions
+    )
     if vault_id:
-        vc = get_vault(vault_id)
         prompt += f"\nYou are currently working in the **{vault_id}** vault"
         if vc.read_only:
             prompt += " (READ-ONLY — you cannot create, update, or delete notes in this vault)"

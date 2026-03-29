@@ -16,6 +16,8 @@ class VaultConfig(BaseModel):
     default: bool = False
     sync_enabled: bool = True
     read_only: bool = False
+    instructions: str = ""
+    daily_note_format: str = ""
 
 
 class VaultReadOnlyError(Exception):

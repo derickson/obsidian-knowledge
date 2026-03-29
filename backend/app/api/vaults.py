@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import os
+import re
 import uuid
+from datetime import date
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -11,6 +13,7 @@ from app.config import settings
 from app.search.client import ensure_index
 from app.search.indexer import reindex_all
 from app.sync import run_ob_sync
+from app.vault.reader import get_vault_structure
 from app.vaults import VaultConfig, delete_vault, get_vault, list_vaults, save_vault
 
 logger = logging.getLogger(__name__)
@@ -196,6 +199,106 @@ async def api_create_vault(request: VaultCreate):
 
 
 # Per-vault action routes — must come before /{vault_id}/ catch-all
+
+
+def _generate_instructions(structure: dict, vault_name: str) -> tuple[str, str]:
+    """Generate vault instruction text from folder structure.
+
+    Returns (instructions_text, suggested_daily_note_format).
+    """
+    date_prefix_re = re.compile(r"^\d{4}-\d{2}-\d{2}[- ]")
+    daily_re = re.compile(r"^\d{4}-\d{2}-\d{2}[- ]Daily\.md$")
+    lines = [f"<!-- Generated: {date.today().isoformat()} -->\n"]
+    lines.append("## Vault organization\n")
+    suggested_daily = ""
+
+    # Root-level files
+    root_files = structure.get("files", [])
+    if root_files:
+        examples = ", ".join(f"`{f}`" for f in root_files[:5])
+        lines.append(
+            f"- **Root level** ({structure.get('file_count', 0)} files): "
+            f"e.g. {examples}"
+        )
+
+    # Folders
+    for folder in structure.get("folders", []):
+        name = folder["name"]
+        count = folder.get("file_count", 0)
+        samples = folder.get("files", [])
+
+        # Detect naming patterns
+        has_dates = any(date_prefix_re.match(f) for f in samples)
+        pattern_note = " (date-prefixed)" if has_dates else ""
+
+        examples = ", ".join(f"`{f}`" for f in samples[:3]) if samples else "empty"
+        lines.append(
+            f"- **{name}/** ({count} files{pattern_note}): "
+            f"e.g. {examples}"
+        )
+
+        # Detect daily note pattern
+        for f in samples:
+            if daily_re.match(f):
+                suggested_daily = f"{name}/{{YYYY}}-{{MM}}-{{DD}}-Daily.md"
+                break
+
+        # Sub-folders
+        for sub in folder.get("folders", []):
+            sub_count = sub.get("file_count", 0)
+            sub_samples = sub.get("files", [])
+            sub_examples = ", ".join(f"`{f}`" for f in sub_samples[:3]) if sub_samples else "empty"
+            lines.append(
+                f"  - **{name}/{sub['name']}/** ({sub_count} files): "
+                f"e.g. {sub_examples}"
+            )
+
+    instructions = "\n".join(lines)
+
+    # Add timestamp convention
+    instructions += (
+        "\n\n## Conventions\n\n"
+        "- All timestamps should use ISO 8601 format (YYYY-MM-DD).\n"
+        "- Notes use YAML frontmatter for metadata and `[[wikilinks]]` for cross-referencing.\n"
+        "- Use relevant tags in frontmatter metadata."
+    )
+
+    if suggested_daily:
+        instructions += (
+            "\n\n## Daily notes\n\n"
+            f"- Daily notes use the pattern `{suggested_daily.replace('{YYYY}', 'YYYY').replace('{MM}', 'MM').replace('{DD}', 'DD')}` "
+            f"in the `{suggested_daily.split('/')[0]}/` folder.\n"
+            "- They use the tags `daily` and `observation` in frontmatter."
+        )
+
+    return instructions, suggested_daily
+
+
+@router.get("/{vault_id}/structure/")
+async def api_vault_structure(vault_id: str):
+    """Get folder structure for a vault."""
+    try:
+        get_vault(vault_id)
+    except ValueError:
+        raise HTTPException(404, f"Vault not found: {vault_id}")
+    structure = await asyncio.to_thread(get_vault_structure, vault_id=vault_id)
+    return {"structure": structure}
+
+
+@router.post("/{vault_id}/instructions/generate/")
+async def api_generate_instructions(vault_id: str):
+    """Generate vault instruction text from folder structure."""
+    try:
+        vc = get_vault(vault_id)
+    except ValueError:
+        raise HTTPException(404, f"Vault not found: {vault_id}")
+    structure = await asyncio.to_thread(get_vault_structure, vault_id=vault_id)
+    instructions, suggested_daily = _generate_instructions(structure, vc.name)
+    return {
+        "instructions": instructions,
+        "suggested_daily_note_format": suggested_daily,
+    }
+
 
 @router.get("/{vault_id}/status/")
 async def api_vault_status(vault_id: str):

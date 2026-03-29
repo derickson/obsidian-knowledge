@@ -4,9 +4,9 @@ from app.config import settings
 from app.search.client import search_notes, semantic_search
 from app.search.indexer import delete_from_index, index_note, reindex_all
 from app.sync import run_ob_sync
-from app.vault.reader import list_notes, read_note
+from app.vault.reader import get_vault_structure, list_notes, read_note
 from app.vault.writer import delete_note, write_note
-from app.vaults import VaultReadOnlyError, check_writable, list_vaults as _list_vaults
+from app.vaults import check_writable, get_vault, list_vaults as _list_vaults
 
 mcp_auth = None
 if settings.mcp_api_key:
@@ -36,21 +36,11 @@ Some vaults are **read-only** — they accept changes only via Obsidian Sync, no
 this server. Attempting to create, update, or delete notes in a read-only vault will return
 a clear error. Check the `read_only` field in `list_vaults` output before writing.
 
-## Vault organization
+## Vault layout discovery
 
-- **Root level**: Primary entries on people, concepts, or tools (e.g., `Dave Erickson.md`, `Elasticsearch.md`)
-- **Meetings/**: Time-driven meeting notes as `Meetings/YYYY-MM-DD-Meeting-Name.md`
-- **Observations/**: Journal entries, thoughts, and general observations as `Observations/YYYY-MM-DD-Topic.md`
-- **Content/**: Notes on consumed content (videos, articles, books) as `Content/Title.md`
-- **Inbox/**: Staging area for unsorted or auto-ingested notes
-- **TestData/**: Reserved for automated tests — do not use
-
-## Daily notes
-
-- Daily notes live in `Observations/` with the naming pattern `YYYY-MM-DD-Daily.md` (e.g., `Observations/2026-03-28-Daily.md`).
-- They use the tags `daily` and `observation` in frontmatter.
-- A daily note captures the day's plans, reflections, and links to other vault entries (meetings, content, people).
-- When the user asks about "today", "yesterday", or a specific date without specifying a note, check the corresponding daily note first.
+Use the `get_vault_layout` tool to discover the folder structure and conventions for a
+specific vault before creating notes. Each vault has its own organization, naming patterns,
+and daily note conventions described in its instructions.
 
 ## Writing notes
 
@@ -73,6 +63,24 @@ a clear error. Check the `read_only` field in `list_vaults` output before writin
 def list_vaults() -> dict:
     """List all configured knowledge base vaults."""
     return {k: v.model_dump() for k, v in _list_vaults().items()}
+
+
+@mcp.tool()
+def get_vault_layout(vault: str | None = None) -> dict:
+    """Get the folder structure and organization conventions for a vault.
+
+    Returns the vault's instruction text (folder purposes, naming conventions,
+    daily note patterns) along with a live folder tree. Call this before creating
+    notes to understand how the vault is organized.
+    """
+    vc = get_vault(vault)
+    result: dict = {"vault_name": vc.name}
+    if vc.instructions:
+        result["instructions"] = vc.instructions
+    if vc.daily_note_format:
+        result["daily_note_format"] = vc.daily_note_format
+    result["folder_structure"] = get_vault_structure(vault_id=vault)
+    return result
 
 
 @mcp.tool()
