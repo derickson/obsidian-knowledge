@@ -90,18 +90,29 @@ async def api_list_local():
     return {"vaults": await list_local_vaults()}
 
 
+class CreateRemoteRequest(BaseModel):
+    name: str
+    password: str
+
+
+class SetupSyncRequest(BaseModel):
+    vault_name: str
+    local_path: str
+    password: str
+
+
 @app.post("/sync/create-remote/")
-async def api_create_remote(name: str, password: str):
+async def api_create_remote(request: CreateRemoteRequest):
     """Create a new remote Obsidian vault with e2ee."""
-    result = await create_remote_vault(name, password)
+    result = await create_remote_vault(request.name, request.password)
     status = "ok" if result["returncode"] == 0 else "error"
     return {"status": status, **result}
 
 
 @app.post("/sync/setup/")
-async def api_setup_sync(vault_name: str, local_path: str, password: str):
+async def api_setup_sync(request: SetupSyncRequest):
     """Set up sync from a local path to a remote vault."""
-    result = await setup_sync(vault_name, local_path, password)
+    result = await setup_sync(request.vault_name, request.local_path, request.password)
     status = "ok" if result["returncode"] == 0 else "error"
     return {"status": status, **result}
 

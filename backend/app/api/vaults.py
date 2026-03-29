@@ -69,7 +69,7 @@ async def api_setup_vault(request: VaultSetup):
         if request.create_remote:
             resp = await client.post(
                 "/sync/create-remote/",
-                params={"name": request.remote_vault_name, "password": request.password},
+                json={"name": request.remote_vault_name, "password": request.password},
             )
             if resp.status_code != 200 or resp.json().get("status") != "ok":
                 return {"status": "error", "step": "create-remote", **resp.json()}
@@ -77,7 +77,7 @@ async def api_setup_vault(request: VaultSetup):
         # 3. Set up sync (links local path to remote vault)
         resp = await client.post(
             "/sync/setup/",
-            params={
+            json={
                 "vault_name": request.remote_vault_name,
                 "local_path": request.local_path,
                 "password": request.password,
