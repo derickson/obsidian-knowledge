@@ -13,8 +13,8 @@ services:
     env_file:
       - .env
     environment:
-      - HOME=/tmp
-      - UV_CACHE_DIR=/tmp/.cache/uv
+      - HOME=/home/dave
+      - XDG_CACHE_HOME=/tmp/.cache
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3104"]
     restart: unless-stopped
 
