@@ -32,10 +32,53 @@ SAMPLE_MANIFEST = [
 ]
 
 
+# Mock vault config for tests
+from app.vaults import VaultConfig  # noqa: E402
+
+TEST_VAULT = VaultConfig(
+    name="Test Vault",
+    path="/tmp/test-vault",
+    sync_path="",
+    es_index="test-index",
+    default=True,
+    sync_enabled=False,
+)
+
+
 @pytest.fixture(autouse=True)
 def vault_dir(tmp_path):
     """Provide a fresh temporary vault directory for headless-level tests."""
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def mock_vaults(monkeypatch):
+    """Mock vault config so tests don't need vaults.json."""
+    mock_get = MagicMock(return_value=TEST_VAULT)
+    mock_list = MagicMock(return_value={"TestVault": TEST_VAULT})
+    for mod in [
+        "app.vaults",
+        "app.vault.reader",
+        "app.vault.writer",
+        "app.sync",
+        "app.search.client",
+        "app.search.indexer",
+        "app.pipeline.runner",
+        "app.api.notes",
+        "app.api.admin",
+        "app.api.vaults",
+        "app.api.chat",
+        "app.mcp.tools",
+    ]:
+        try:
+            monkeypatch.setattr(f"{mod}.get_vault", mock_get)
+        except AttributeError:
+            pass
+        try:
+            monkeypatch.setattr(f"{mod}.list_vaults", mock_list)
+        except AttributeError:
+            pass
+    return {"get_vault": mock_get, "list_vaults": mock_list}
 
 
 @pytest.fixture(autouse=True)
@@ -100,7 +143,7 @@ def mock_headless(monkeypatch):
         except AttributeError:
             pass
 
-    async def async_sync():
+    async def async_sync(*args, **kwargs):
         return mock_sync()
 
     monkeypatch.setattr("app.sync.run_ob_sync", async_sync)

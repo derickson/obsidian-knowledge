@@ -9,7 +9,7 @@ services:
     volumes:
       - ./vaults:/app/vaults
       - /home/dave/.config/obsidian-headless:/home/dave/.config/obsidian-headless
-      - ./vaults/AgentKnowledge:/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge
+      - /home/dave:/home/dave:ro
     env_file:
       - .env
     environment:
@@ -26,6 +26,7 @@ services:
       - "3105:3105"
     volumes:
       - ./backend/app:/app/backend/app
+      - ./vaults.json:/app/vaults.json:ro
     env_file:
       - .env
     environment:

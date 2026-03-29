@@ -2,11 +2,11 @@ from fastmcp import FastMCP
 
 from app.config import settings
 from app.search.client import search_notes, semantic_search
-from app.search.indexer import index_note, reindex_all
+from app.search.indexer import delete_from_index, index_note, reindex_all
 from app.sync import run_ob_sync
-from app.search.indexer import delete_from_index
-from app.vault.reader import read_note, list_notes
-from app.vault.writer import write_note, delete_note
+from app.vault.reader import list_notes, read_note
+from app.vault.writer import delete_note, write_note
+from app.vaults import list_vaults as _list_vaults
 
 mcp_auth = None
 if settings.mcp_api_key:
@@ -25,6 +25,12 @@ mcp = FastMCP(
 The user is Dave Erickson. When the user says "my", "I", or "me", they mean Dave Erickson.
 
 Notes are markdown files with YAML frontmatter for metadata and [[wikilinks]] for cross-referencing.
+
+## Multi-vault
+
+This server manages multiple Obsidian vaults. All tools accept an optional `vault` parameter
+(vault ID string). If omitted, the default vault is used. Use `list_vaults` to discover
+available vaults.
 
 ## Vault organization
 
@@ -60,62 +66,69 @@ Notes are markdown files with YAML frontmatter for metadata and [[wikilinks]] fo
 
 
 @mcp.tool()
-def search(query: str, size: int = 10) -> list[dict]:
+def list_vaults() -> dict:
+    """List all configured knowledge base vaults."""
+    return {k: v.model_dump() for k, v in _list_vaults().items()}
+
+
+@mcp.tool()
+def search(query: str, size: int = 10, vault: str | None = None) -> list[dict]:
     """Full-text search across all notes in the knowledge base."""
-    return search_notes(query, size)
+    return search_notes(query, size, vault_id=vault)
 
 
 @mcp.tool()
-def semantic(query: str, size: int = 10) -> list[dict]:
+def semantic(query: str, size: int = 10, vault: str | None = None) -> list[dict]:
     """Semantic search across notes using Jina embeddings."""
-    return semantic_search(query, size)
+    return semantic_search(query, size, vault_id=vault)
 
 
 @mcp.tool()
-def read(path: str) -> dict:
+def read(path: str, vault: str | None = None) -> dict:
     """Read a specific note by its path relative to the vault root."""
-    return read_note(path)
+    return read_note(path, vault_id=vault)
 
 
 @mcp.tool()
-def list_all_notes(folder: str | None = None) -> list[str]:
+def list_all_notes(folder: str | None = None, vault: str | None = None) -> list[str]:
     """List all notes in the vault, optionally filtered by folder."""
-    return list_notes(folder)
+    return list_notes(folder, vault_id=vault)
 
 
 @mcp.tool()
-async def create(path: str, content: str, metadata: dict | None = None) -> dict:
+async def create(
+    path: str, content: str, metadata: dict | None = None, vault: str | None = None
+) -> dict:
     """Create or update a note in the knowledge base.
 
     Args:
         path: Path relative to vault root (e.g., "Inbox/my-note.md")
         content: Markdown content for the note
         metadata: Optional frontmatter metadata (tags, source, etc.)
+        vault: Vault ID (optional, defaults to the default vault)
     """
-    write_note(path, content, metadata)
-    note = read_note(path)
-    index_note(note)
-    await run_ob_sync()
+    write_note(path, content, metadata, vault_id=vault)
+    note = read_note(path, vault_id=vault)
+    index_note(note, vault_id=vault)
+    await run_ob_sync(vault_id=vault)
     return {"status": "created", "path": path}
 
 
 @mcp.tool()
-async def delete(path: str) -> dict:
+async def delete(path: str, vault: str | None = None) -> dict:
     """Delete a single note from the knowledge base.
-
-    Removes the note from both the vault and the Elasticsearch index,
-    then syncs the change to Obsidian cloud.
 
     Args:
         path: Path of the note to delete (e.g., "People/Old Note.md")
+        vault: Vault ID (optional, defaults to the default vault)
     """
-    delete_note(path)
-    delete_from_index(path)
-    await run_ob_sync()
+    delete_note(path, vault_id=vault)
+    delete_from_index(path, vault_id=vault)
+    await run_ob_sync(vault_id=vault)
     return {"status": "deleted", "path": path}
 
 
 @mcp.tool()
-def reindex() -> dict:
+def reindex(vault: str | None = None) -> dict:
     """Reindex all vault notes into Elasticsearch."""
-    return reindex_all()
+    return reindex_all(vault_id=vault)

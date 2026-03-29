@@ -1,0 +1,12 @@
+{
+  "vaults": {
+    "AgentKnowledge": {
+      "name": "Agent Knowledge",
+      "path": "/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge",
+      "sync_path": "/home/dave/dev/obsidian-knowledge/vaults/AgentKnowledge",
+      "es_index": "obsidian-knowledge-agentknowledge",
+      "default": true,
+      "sync_enabled": true
+    }
+  }
+}

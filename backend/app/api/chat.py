@@ -149,39 +149,52 @@ def _truncate_search_results(results: list[dict]) -> list[dict]:
     return truncated
 
 
-async def execute_tool(name: str, tool_input: dict) -> str:
+async def execute_tool(name: str, tool_input: dict, vault_id: str | None = None) -> str:
     """Execute a tool and return the result as a JSON string."""
     try:
         match name:
             case "search":
                 result = await asyncio.to_thread(
-                    search_notes, tool_input["query"], tool_input.get("size", 10)
+                    search_notes, tool_input["query"], tool_input.get("size", 10),
+                    vault_id=vault_id,
                 )
                 result = _truncate_search_results(result)
             case "semantic":
                 result = await asyncio.to_thread(
-                    semantic_search, tool_input["query"], tool_input.get("size", 10)
+                    semantic_search, tool_input["query"], tool_input.get("size", 10),
+                    vault_id=vault_id,
                 )
                 result = _truncate_search_results(result)
             case "read":
-                result = await asyncio.to_thread(read_note, tool_input["path"])
+                result = await asyncio.to_thread(
+                    read_note, tool_input["path"], vault_id=vault_id
+                )
             case "list_all_notes":
-                result = await asyncio.to_thread(list_notes, tool_input.get("folder"))
+                result = await asyncio.to_thread(
+                    list_notes, tool_input.get("folder"), vault_id=vault_id
+                )
             case "create":
                 await asyncio.to_thread(
-                    write_note, tool_input["path"], tool_input["content"], tool_input.get("metadata")
+                    write_note, tool_input["path"], tool_input["content"],
+                    tool_input.get("metadata"), vault_id=vault_id,
                 )
-                note = await asyncio.to_thread(read_note, tool_input["path"])
-                await asyncio.to_thread(index_note, note)
-                await run_ob_sync()
+                note = await asyncio.to_thread(
+                    read_note, tool_input["path"], vault_id=vault_id
+                )
+                await asyncio.to_thread(index_note, note, vault_id=vault_id)
+                await run_ob_sync(vault_id=vault_id)
                 result = {"status": "created", "path": tool_input["path"]}
             case "delete":
-                await asyncio.to_thread(delete_note, tool_input["path"])
-                await asyncio.to_thread(delete_from_index, tool_input["path"])
-                await run_ob_sync()
+                await asyncio.to_thread(
+                    delete_note, tool_input["path"], vault_id=vault_id
+                )
+                await asyncio.to_thread(
+                    delete_from_index, tool_input["path"], vault_id=vault_id
+                )
+                await run_ob_sync(vault_id=vault_id)
                 result = {"status": "deleted", "path": tool_input["path"]}
             case "reindex":
-                result = await asyncio.to_thread(reindex_all)
+                result = await asyncio.to_thread(reindex_all, vault_id=vault_id)
             case _:
                 result = {"error": f"Unknown tool: {name}"}
     except Exception as e:
@@ -192,7 +205,9 @@ async def execute_tool(name: str, tool_input: dict) -> str:
 
 
 def build_system_prompt(
-    focused_note_path: str | None, tz_name: str = "America/New_York"
+    focused_note_path: str | None,
+    tz_name: str = "America/New_York",
+    vault_id: str | None = None,
 ) -> str:
     """Build system prompt, optionally including focused note content."""
     try:
@@ -201,9 +216,11 @@ def build_system_prompt(
         tz = ZoneInfo("America/New_York")
     now = datetime.now(tz).strftime("%A, %Y-%m-%d %H:%M %Z")
     prompt = f"Current date and time: {now}\n\n" + SYSTEM_INSTRUCTIONS
+    if vault_id:
+        prompt += f"\nYou are currently working in the **{vault_id}** vault.\n"
     if focused_note_path:
         try:
-            note = read_note(focused_note_path)
+            note = read_note(focused_note_path, vault_id=vault_id)
             prompt += f"""
 ## Currently focused note
 
@@ -226,6 +243,7 @@ class ChatRequest(BaseModel):
     model: str = "claude-haiku-4-5-20251001"
     focused_note_path: str | None = None
     timezone: str = "America/New_York"
+    vault: str | None = None
 
 
 @router.post("/")
@@ -235,7 +253,9 @@ async def chat(request: ChatRequest):
 
     async def event_stream():
         messages = request.messages
-        system_prompt = build_system_prompt(request.focused_note_path, request.timezone)
+        system_prompt = build_system_prompt(
+            request.focused_note_path, request.timezone, vault_id=request.vault
+        )
 
         while True:
             collected_content = []
@@ -266,7 +286,7 @@ async def chat(request: ChatRequest):
                 tool_results = []
                 for block in collected_content:
                     if block.type == "tool_use":
-                        result = await execute_tool(block.name, block.input)
+                        result = await execute_tool(block.name, block.input, vault_id=request.vault)
                         yield f"data: {json.dumps({'type': 'tool_result', 'name': block.name, 'id': block.id})}\n\n"
                         tool_results.append({
                             "type": "tool_result",

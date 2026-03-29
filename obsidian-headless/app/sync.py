@@ -6,11 +6,12 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-async def run_ob_sync() -> dict:
+async def run_ob_sync(sync_path: str | None = None) -> dict:
     """Run `ob sync` to sync vault with Obsidian cloud."""
+    path = sync_path or settings.vault_sync_path or settings.vault_path
     proc = await asyncio.create_subprocess_exec(
         "ob", "sync",
-        "--path", settings.vault_sync_path or settings.vault_path,
+        "--path", path,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

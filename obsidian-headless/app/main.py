@@ -19,53 +19,53 @@ class NoteWrite(BaseModel):
 
 
 @app.get("/notes/")
-async def api_list_notes(folder: str | None = None):
+async def api_list_notes(folder: str | None = None, vault: str | None = None):
     """List all notes in the vault."""
-    base = vault_path()
-    return {"notes": [str(p.relative_to(base)) for p in list_notes(folder)]}
+    base = vault_path(vault)
+    return {"notes": [str(p.relative_to(base)) for p in list_notes(folder, vault)]}
 
 
 @app.get("/notes/manifest/")
-async def api_manifest():
+async def api_manifest(vault: str | None = None):
     """Return path and mtime for all notes (lightweight, no content reading)."""
-    base = vault_path()
+    base = vault_path(vault)
     manifest = []
-    for p in list_notes():
+    for p in list_notes(vault=vault):
         rel = str(p.relative_to(base))
         manifest.append({"path": rel, "last_modified": int(p.stat().st_mtime)})
     return {"notes": manifest}
 
 
 @app.get("/notes/{path:path}")
-async def api_read_note(path: str):
+async def api_read_note(path: str, vault: str | None = None):
     """Read a note from the vault."""
     try:
-        return read_note(path)
+        return read_note(path, vault)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Note not found: {path}")
 
 
 @app.post("/notes/")
-async def api_write_note(note: NoteWrite):
+async def api_write_note(note: NoteWrite, vault: str | None = None):
     """Write a note to the vault."""
-    write_note(note.path, note.content, note.metadata)
-    return read_note(note.path)
+    write_note(note.path, note.content, note.metadata, vault)
+    return read_note(note.path, vault)
 
 
 @app.delete("/notes/{path:path}")
-async def api_delete_note(path: str):
+async def api_delete_note(path: str, vault: str | None = None):
     """Delete a note from the vault."""
     try:
-        read_note(path)
+        read_note(path, vault)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Note not found: {path}")
-    delete_note(path)
+    delete_note(path, vault)
     return {"status": "deleted", "path": path}
 
 
 @app.post("/sync/")
-async def api_sync():
+async def api_sync(sync_path: str | None = None):
     """Trigger ob sync."""
-    result = await run_ob_sync()
+    result = await run_ob_sync(sync_path)
     status = "ok" if result["returncode"] == 0 else "error"
     return {"status": status, **result}

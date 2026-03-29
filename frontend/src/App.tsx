@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 declare const __API_PREFIX__: string;
 const API = `${__API_PREFIX__}/api/notes/`;
 const CHAT_API = `${__API_PREFIX__}/api/chat/`;
+const VAULTS_API = `${__API_PREFIX__}/api/vaults/`;
 
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
@@ -58,6 +59,8 @@ export default function App() {
   );
   const [mobileView, setMobileView] = useState<MobileView>("list");
 
+  const [vaults, setVaults] = useState<Record<string, { name: string; default?: boolean }>>({});
+  const [currentVault, setCurrentVault] = useState<string>("AgentKnowledge");
   const [existingNotes, setExistingNotes] = useState<Set<string>>(new Set());
 
   const [showInfo, setShowInfo] = useState(false);
@@ -72,20 +75,44 @@ export default function App() {
 
   const isMobile = useIsMobile();
 
+  const vaultParam = (extra?: Record<string, string>) => {
+    const params = new URLSearchParams({ vault: currentVault, ...extra });
+    return `?${params}`;
+  };
+
   const refreshNoteList = () => {
-    fetch(`${API}list/`)
+    fetch(`${API}list/${vaultParam()}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.notes && setExistingNotes(new Set(d.notes)))
       .catch(() => {});
   };
 
+  // Fetch vaults on mount
   useEffect(() => {
-    fetch(`${API}recent/?size=20`)
+    fetch(VAULTS_API)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.vaults) {
+          setVaults(d.vaults);
+          const def = Object.entries(d.vaults).find(
+            ([, v]: [string, any]) => v.default,
+          );
+          if (def) setCurrentVault(def[0]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load notes when vault changes
+  useEffect(() => {
+    setSelected(null);
+    setResults([]);
+    fetch(`${API}recent/${vaultParam({ size: "20" })}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.results && setResults(d.results))
       .catch(() => {});
     refreshNoteList();
-  }, []);
+  }, [currentVault]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -100,12 +127,12 @@ export default function App() {
 
   const handleSearch = async () => {
     if (!query.trim()) {
-      const resp = await fetch(`${API}recent/?size=20`);
+      const resp = await fetch(`${API}recent/${vaultParam({ size: "20" })}`);
       const data = await resp.json();
       if (data?.results) setResults(data.results);
       return;
     }
-    const endpoint = `${API}semantic-search/`;
+    const endpoint = `${API}semantic-search/${vaultParam()}`;
     const resp = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -116,7 +143,7 @@ export default function App() {
   };
 
   const handleSelect = async (path: string) => {
-    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
+    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}${vaultParam()}`);
     if (resp.ok) {
       setSelected(await resp.json());
       if (isMobile) setMobileView("detail");
@@ -147,6 +174,7 @@ export default function App() {
           model: chatModel,
           focused_note_path: selected?.path || null,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          vault: currentVault,
         }),
       });
 
@@ -202,7 +230,7 @@ export default function App() {
               if (selected?.path) {
                 handleSelect(selected.path).catch(() => setSelected(null));
               }
-              fetch(`${API}recent/?size=20`)
+              fetch(`${API}recent/${vaultParam({ size: "20" })}`)
                 .then((r) => (r.ok ? r.json() : null))
                 .then((d) => d?.results && setResults(d.results))
                 .catch(() => {});
@@ -310,7 +338,7 @@ export default function App() {
     const path = `Observations/${dateStr}-Daily.md`;
 
     // Try to read it first
-    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
+    const resp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}${vaultParam()}`);
     if (resp.ok) {
       setSelected(await resp.json());
       if (isMobile) setMobileView("detail");
@@ -319,7 +347,7 @@ export default function App() {
 
     // Create it
     const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
-    await fetch(API, {
+    await fetch(`${API}${vaultParam()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -334,14 +362,14 @@ export default function App() {
     });
 
     // Now read and select it
-    const readResp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}`);
+    const readResp = await fetch(`${API}${path.split("/").map(encodeURIComponent).join("/")}${vaultParam()}`);
     if (readResp.ok) {
       setSelected(await readResp.json());
       if (isMobile) setMobileView("detail");
     }
 
     // Refresh the list
-    fetch(`${API}recent/?size=20`)
+    fetch(`${API}recent/${vaultParam({ size: "20" })}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d?.results && setResults(d.results))
       .catch(() => {});
@@ -560,9 +588,22 @@ export default function App() {
     >
       {/* Header */}
       <header style={theme.header}>
-        <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
-          Obsidian Knowledge
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
+            Obsidian Knowledge
+          </h1>
+          {Object.keys(vaults).length > 1 && (
+            <select
+              value={currentVault}
+              onChange={(e) => setCurrentVault(e.target.value)}
+              style={{ ...theme.select, fontSize: 12, padding: "4px 8px" }}
+            >
+              {Object.entries(vaults).map(([id, v]: [string, any]) => (
+                <option key={id} value={id}>{v.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={handleToday} style={theme.iconButton} title="Today's observations">
             📅

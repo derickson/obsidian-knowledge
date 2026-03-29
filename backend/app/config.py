@@ -2,10 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Elasticsearch Serverless
+    # Elasticsearch Serverless (ES index is per-vault in vaults.json)
     es_url: str = ""
     es_api_key: str = ""
-    es_index: str = "obsidian-knowledge"
     es_inference_id: str = "jina-v3-small"
 
     # Anthropic

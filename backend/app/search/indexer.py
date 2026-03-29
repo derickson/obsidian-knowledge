@@ -2,19 +2,21 @@ from pathlib import Path
 
 from elasticsearch.helpers import bulk
 
-from app.config import settings
 from app.search.client import es_client, ensure_index
 from app.vault.reader import list_manifest, read_note
+from app.vaults import get_vault
 
 
-def delete_from_index(path: str) -> None:
+def delete_from_index(path: str, vault_id: str | None = None) -> None:
     """Delete a single note from the Elasticsearch index."""
-    es_client.delete(index=settings.es_index, id=path, ignore=[404])
+    index = get_vault(vault_id).es_index
+    es_client.delete(index=index, id=path, ignore=[404])
 
 
-def index_note(note: dict) -> None:
+def index_note(note: dict, vault_id: str | None = None) -> None:
     """Index a single note into Elasticsearch."""
-    ensure_index()
+    index = get_vault(vault_id).es_index
+    ensure_index(vault_id)
     doc = {
         "path": note["path"],
         "folder": str(Path(note["path"]).parent),
@@ -27,20 +29,16 @@ def index_note(note: dict) -> None:
         "content_hash": note["content_hash"],
         "last_modified": int(note["last_modified"]),
     }
-    es_client.index(index=settings.es_index, id=note["path"], document=doc)
+    es_client.index(index=index, id=note["path"], document=doc)
 
 
-def reindex_all() -> dict:
-    """Incremental reindex: only read and index notes that have changed.
+def reindex_all(vault_id: str | None = None) -> dict:
+    """Incremental reindex: only read and index notes that have changed."""
+    vc = get_vault(vault_id)
+    ensure_index(vault_id)
 
-    Uses file mtime from the vault manifest to skip unchanged files.
-    Only files whose mtime differs from ES last_modified are fully read
-    and content-hashed. This avoids N HTTP reads on every sync.
-    """
-    ensure_index()
-
-    existing = _get_existing_state()
-    manifest = list_manifest()
+    existing = _get_existing_state(vault_id)
+    manifest = list_manifest(vault_id)
 
     indexed, skipped, deleted = 0, 0, 0
     actions = []
@@ -51,21 +49,18 @@ def reindex_all() -> dict:
         vault_mtime = entry["last_modified"]
         seen_paths.add(rel_path)
 
-        # Skip if mtime hasn't changed — file is untouched
         if rel_path in existing and existing[rel_path]["last_modified"] == vault_mtime:
             skipped += 1
             continue
 
-        # mtime changed or new file — read full content and check hash
-        note = read_note(rel_path)
+        note = read_note(rel_path, vault_id=vault_id)
 
         if rel_path in existing and existing[rel_path]["content_hash"] == note["content_hash"]:
-            # mtime changed but content identical (e.g., touch or metadata-only change)
             skipped += 1
             continue
 
         actions.append({
-            "_index": settings.es_index,
+            "_index": vc.es_index,
             "_id": rel_path,
             "_source": {
                 "path": rel_path,
@@ -85,21 +80,21 @@ def reindex_all() -> dict:
     if actions:
         bulk(es_client, actions)
 
-    # Delete docs for notes that no longer exist in the vault
     for path in existing:
         if path not in seen_paths:
-            es_client.delete(index=settings.es_index, id=path, ignore=[404])
+            es_client.delete(index=vc.es_index, id=path, ignore=[404])
             deleted += 1
 
     return {"indexed": indexed, "skipped": skipped, "deleted": deleted}
 
 
-def _get_existing_state() -> dict[str, dict]:
+def _get_existing_state(vault_id: str | None = None) -> dict[str, dict]:
     """Get path -> {content_hash, last_modified} from ES for change detection."""
+    index = get_vault(vault_id).es_index
     state = {}
     try:
         resp = es_client.search(
-            index=settings.es_index,
+            index=index,
             query={"match_all": {}},
             _source=["path", "content_hash", "last_modified"],
             size=10000,
