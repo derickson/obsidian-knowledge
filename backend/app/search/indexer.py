@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 
 from elasticsearch.helpers import bulk
+
+logger = logging.getLogger(__name__)
 
 from app.search.client import es_client, ensure_index
 from app.vault.reader import list_manifest, read_note
@@ -53,7 +56,12 @@ def reindex_all(vault_id: str | None = None) -> dict:
             skipped += 1
             continue
 
-        note = read_note(rel_path, vault_id=vault_id)
+        try:
+            note = read_note(rel_path, vault_id=vault_id)
+        except Exception as e:
+            logger.warning("Skipping %s: %s", rel_path, e)
+            skipped += 1
+            continue
 
         if rel_path in existing and existing[rel_path]["content_hash"] == note["content_hash"]:
             skipped += 1
@@ -78,7 +86,7 @@ def reindex_all(vault_id: str | None = None) -> dict:
         indexed += 1
 
     if actions:
-        bulk(es_client, actions)
+        bulk(es_client, actions, chunk_size=50, request_timeout=300)
 
     for path in existing:
         if path not in seen_paths:

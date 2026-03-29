@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 import httpx
 
 from app.config import settings
@@ -33,7 +35,7 @@ def read_note(path: str, vault_id: str | None = None) -> dict:
     """Read a note via headless service."""
     vc = get_vault(vault_id)
     with _client() as client:
-        resp = client.get(f"/notes/{path}", params={"vault": vc.path})
+        resp = client.get(f"/notes/{quote(path, safe='/')}", params={"vault": vc.path})
         if resp.status_code == 404:
             raise FileNotFoundError(f"Note not found: {path}")
         resp.raise_for_status()
