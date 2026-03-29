@@ -69,6 +69,9 @@ export default function App() {
   const [remoteVaults, setRemoteVaults] = useState<any[]>([]);
   const [editingVault, setEditingVault] = useState<string | null>(null);
   const [vaultActionStatus, setVaultActionStatus] = useState<Record<string, string>>({});
+  const [setupVault, setSetupVault] = useState<any | null>(null);
+  const [setupForm, setSetupForm] = useState({ localPath: "", password: "", vaultId: "", esIndex: "" });
+  const [setupStatus, setSetupStatus] = useState<string>("");
   const [chatOpen, setChatOpen] = useState(window.innerWidth >= 768);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -966,29 +969,16 @@ export default function App() {
                                 <td style={{ padding: "8px 12px" }}>
                                   {!alreadyConfigured && (
                                     <button
-                                      onClick={async () => {
+                                      onClick={() => {
                                         const vaultId = rv.name.replace(/\s+/g, "");
-                                        const localPath = `/home/dave/dev/obsidian-knowledge/vaults/${vaultId}`;
-                                        const resp = await fetch(`${VAULTS_API}setup/`, {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({
-                                            vault_id: vaultId,
-                                            name: rv.name,
-                                            remote_vault_name: rv.name,
-                                            local_path: localPath,
-                                            sync_path: localPath,
-                                            es_index: `obsidian-knowledge-${vaultId.toLowerCase()}`,
-                                            create_remote: false,
-                                          }),
+                                        setSetupVault(rv);
+                                        setSetupForm({
+                                          localPath: `/home/dave/dev/obsidian-knowledge/vaults/${vaultId}`,
+                                          password: "",
+                                          vaultId,
+                                          esIndex: `obsidian-knowledge-${vaultId.toLowerCase()}`,
                                         });
-                                        const d = await resp.json();
-                                        if (d.status === "ok") {
-                                          const vr = await fetch(VAULTS_API);
-                                          if (vr.ok) setVaults((await vr.json()).vaults);
-                                        } else {
-                                          alert(`Setup failed: ${JSON.stringify(d)}`);
-                                        }
+                                        setSetupStatus("");
                                       }}
                                       style={{ ...theme.headerButton, fontSize: 11, padding: "2px 8px" }}
                                     >
@@ -1001,6 +991,112 @@ export default function App() {
                           })}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+
+                  {/* Setup vault dialog */}
+                  {setupVault && (
+                    <div style={{
+                      padding: 20, marginTop: 16,
+                      border: `2px solid #7c3aed`,
+                      borderRadius: 8, background: dark ? "#1e1e3a" : "#f9f9f9",
+                    }}>
+                      <h4 style={{ margin: "0 0 4px" }}>Set Up Vault: {setupVault.name}</h4>
+                      <p style={{ fontSize: 13, opacity: 0.6, margin: "0 0 16px" }}>
+                        This will create the local directory, link it to the remote vault,
+                        run an initial sync, and index into Elasticsearch.
+                      </p>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>Vault ID</label>
+                        <input
+                          value={setupForm.vaultId}
+                          onChange={(e) => setSetupForm({ ...setupForm, vaultId: e.target.value })}
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>Local Directory</label>
+                        <input
+                          value={setupForm.localPath}
+                          onChange={(e) => setSetupForm({ ...setupForm, localPath: e.target.value })}
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>Encryption Password (e2ee)</label>
+                        <input
+                          type="password"
+                          value={setupForm.password}
+                          onChange={(e) => setSetupForm({ ...setupForm, password: e.target.value })}
+                          placeholder="Enter the vault's encryption password"
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 2 }}>ES Index Name</label>
+                        <input
+                          value={setupForm.esIndex}
+                          onChange={(e) => setSetupForm({ ...setupForm, esIndex: e.target.value })}
+                          style={{ ...theme.searchInput, width: "100%" }}
+                        />
+                      </div>
+                      {setupStatus && (
+                        <div style={{
+                          padding: "8px 12px", marginBottom: 12, borderRadius: 6, fontSize: 13,
+                          background: setupStatus.startsWith("Error") ? "#fef2f2" : (dark ? "#1a2e1a" : "#f0fdf4"),
+                          color: setupStatus.startsWith("Error") ? "#dc2626" : "#16a34a",
+                        }}>
+                          {setupStatus}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={async () => {
+                            if (!setupForm.password) {
+                              setSetupStatus("Error: Encryption password is required");
+                              return;
+                            }
+                            setSetupStatus("Setting up vault...");
+                            try {
+                              const resp = await fetch(`${VAULTS_API}setup/`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  vault_id: setupForm.vaultId,
+                                  name: setupVault.name,
+                                  remote_vault_name: setupVault.name,
+                                  local_path: setupForm.localPath,
+                                  sync_path: setupForm.localPath,
+                                  es_index: setupForm.esIndex,
+                                  password: setupForm.password,
+                                  create_remote: false,
+                                }),
+                              });
+                              const d = await resp.json();
+                              if (d.status === "ok") {
+                                setSetupStatus(`Done! Synced and indexed ${d.reindex?.indexed || 0} notes.`);
+                                const vr = await fetch(VAULTS_API);
+                                if (vr.ok) setVaults((await vr.json()).vaults);
+                                setTimeout(() => { setSetupVault(null); setSetupStatus(""); }, 2000);
+                              } else {
+                                setSetupStatus(`Error at ${d.step || "unknown"}: ${d.stderr || d.stdout || JSON.stringify(d)}`);
+                              }
+                            } catch (e) {
+                              setSetupStatus(`Error: ${e}`);
+                            }
+                          }}
+                          style={theme.button}
+                          disabled={setupStatus === "Setting up vault..."}
+                        >
+                          {setupStatus === "Setting up vault..." ? "Setting up..." : "Set Up Vault"}
+                        </button>
+                        <button
+                          onClick={() => { setSetupVault(null); setSetupStatus(""); }}
+                          style={theme.headerButton}
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

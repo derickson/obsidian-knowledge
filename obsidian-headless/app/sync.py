@@ -74,14 +74,20 @@ async def list_local_vaults() -> list[dict]:
     return vaults
 
 
-async def create_remote_vault(name: str) -> dict:
-    """Create a new remote Obsidian vault."""
-    return await _run_ob("sync-create-remote", "--name", name)
+async def create_remote_vault(name: str, password: str) -> dict:
+    """Create a new remote Obsidian vault with e2ee."""
+    return await _run_ob(
+        "sync-create-remote", "--name", name,
+        "--encryption", "e2ee", "--password", password,
+    )
 
 
-async def setup_sync(vault_name: str, local_path: str) -> dict:
+async def setup_sync(vault_name: str, local_path: str, password: str) -> dict:
     """Set up sync from a local path to a remote vault."""
-    return await _run_ob("sync-setup", "--vault", vault_name, "--path", local_path)
+    return await _run_ob(
+        "sync-setup", "--vault", vault_name,
+        "--path", local_path, "--password", password,
+    )
 
 
 async def sync_status(path: str) -> dict:

@@ -91,17 +91,17 @@ async def api_list_local():
 
 
 @app.post("/sync/create-remote/")
-async def api_create_remote(name: str):
-    """Create a new remote Obsidian vault."""
-    result = await create_remote_vault(name)
+async def api_create_remote(name: str, password: str):
+    """Create a new remote Obsidian vault with e2ee."""
+    result = await create_remote_vault(name, password)
     status = "ok" if result["returncode"] == 0 else "error"
     return {"status": status, **result}
 
 
 @app.post("/sync/setup/")
-async def api_setup_sync(vault_name: str, local_path: str):
+async def api_setup_sync(vault_name: str, local_path: str, password: str):
     """Set up sync from a local path to a remote vault."""
-    result = await setup_sync(vault_name, local_path)
+    result = await setup_sync(vault_name, local_path, password)
     status = "ok" if result["returncode"] == 0 else "error"
     return {"status": status, **result}
 

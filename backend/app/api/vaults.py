@@ -1,8 +1,11 @@
+import os
+
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
+from app.search.client import ensure_index
 from app.search.indexer import reindex_all
 from app.sync import run_ob_sync
 from app.vaults import VaultConfig, delete_vault, get_vault, list_vaults, save_vault
@@ -26,6 +29,7 @@ class VaultSetup(BaseModel):
     local_path: str
     sync_path: str
     es_index: str
+    password: str
     create_remote: bool = False
 
 
@@ -56,26 +60,37 @@ async def api_list_local():
 
 @router.post("/setup/")
 async def api_setup_vault(request: VaultSetup):
-    """Set up a new vault: optionally create remote, run sync-setup, register in config."""
+    """Full vault setup: create dir, optionally create remote, sync-setup, initial sync, register, create ES index."""
+    # 1. Create local directory if it doesn't exist
+    os.makedirs(request.local_path, exist_ok=True)
+
     async with _headless_client() as client:
-        # Create remote vault if requested
+        # 2. Create remote vault if requested
         if request.create_remote:
             resp = await client.post(
                 "/sync/create-remote/",
-                params={"name": request.remote_vault_name},
+                params={"name": request.remote_vault_name, "password": request.password},
             )
             if resp.status_code != 200 or resp.json().get("status") != "ok":
                 return {"status": "error", "step": "create-remote", **resp.json()}
 
-        # Set up sync
+        # 3. Set up sync (links local path to remote vault)
         resp = await client.post(
             "/sync/setup/",
-            params={"vault_name": request.remote_vault_name, "local_path": request.local_path},
+            params={
+                "vault_name": request.remote_vault_name,
+                "local_path": request.local_path,
+                "password": request.password,
+            },
         )
         if resp.status_code != 200 or resp.json().get("status") != "ok":
             return {"status": "error", "step": "sync-setup", **resp.json()}
 
-    # Register in vaults.json
+        # 4. Run initial sync to pull down notes
+        resp = await client.post("/sync/", params={"sync_path": request.sync_path or request.local_path})
+        sync_result = resp.json() if resp.status_code == 200 else {}
+
+    # 5. Register in vaults.json
     config = VaultConfig(
         name=request.name,
         path=request.local_path,
@@ -86,7 +101,18 @@ async def api_setup_vault(request: VaultSetup):
     )
     save_vault(request.vault_id, config)
 
-    return {"status": "ok", "vault_id": request.vault_id}
+    # 6. Create ES index
+    ensure_index(vault_id=request.vault_id)
+
+    # 7. Initial reindex
+    reindex_result = reindex_all(vault_id=request.vault_id)
+
+    return {
+        "status": "ok",
+        "vault_id": request.vault_id,
+        "sync": sync_result,
+        "reindex": reindex_result,
+    }
 
 
 @router.post("/")
