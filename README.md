@@ -136,6 +136,7 @@ make up              # Start all services
 make down            # Stop all services
 make redeploy        # down + build + up
 make logs            # Tail logs
+make sync-fix        # Kill stuck ob sync processes + redeploy
 ```
 
 ### Production with nginx

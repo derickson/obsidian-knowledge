@@ -1,4 +1,4 @@
-.PHONY: init up down build redeploy logs dev dev-stop sync reindex test test-integration lint build-frontend
+.PHONY: init up down build redeploy logs dev dev-stop sync sync-fix reindex test test-integration lint build-frontend
 
 # --- Setup ---
 
@@ -50,6 +50,9 @@ dev-stop:
 
 sync:
 	curl -s -X POST http://localhost:3104/sync/ | python3 -m json.tool
+
+sync-fix:
+	./sync-panic-button.sh
 
 reindex:
 	curl -s -X POST http://localhost:3105/obsidian-knowledge/api/admin/reindex/ | python3 -m json.tool

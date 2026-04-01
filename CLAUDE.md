@@ -65,6 +65,7 @@ uv run pytest -k test_read_existing_note     # Run a single test by name
 
 # Admin
 make reindex         # Full reindex vault → ES
+make sync-fix        # Kill stuck ob sync processes + redeploy
 ```
 
 ## Backend (Python)
