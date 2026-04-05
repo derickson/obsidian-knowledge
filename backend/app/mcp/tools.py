@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 from fastmcp import FastMCP
 
 from app.config import settings
@@ -7,6 +10,8 @@ from app.sync import run_ob_sync
 from app.vault.reader import get_vault_structure, list_notes, read_note
 from app.vault.writer import delete_note, write_note
 from app.vaults import check_writable, get_vault, list_vaults as _list_vaults
+
+logger = logging.getLogger(__name__)
 
 mcp_auth = None
 if settings.mcp_api_key:
@@ -121,9 +126,16 @@ async def create(
     """
     check_writable(vault)
     write_note(path, content, metadata, vault_id=vault)
-    note = read_note(path, vault_id=vault)
-    index_note(note, vault_id=vault)
-    await run_ob_sync(vault_id=vault)
+
+    async def _post_process():
+        try:
+            note = read_note(path, vault_id=vault)
+            index_note(note, vault_id=vault)
+            await run_ob_sync(vault_id=vault)
+        except Exception:
+            logger.exception("Post-processing failed for %s", path)
+
+    asyncio.create_task(_post_process())
     return {"status": "created", "path": path}
 
 
@@ -137,8 +149,15 @@ async def delete(path: str, vault: str | None = None) -> dict:
     """
     check_writable(vault)
     delete_note(path, vault_id=vault)
-    delete_from_index(path, vault_id=vault)
-    await run_ob_sync(vault_id=vault)
+
+    async def _post_process():
+        try:
+            delete_from_index(path, vault_id=vault)
+            await run_ob_sync(vault_id=vault)
+        except Exception:
+            logger.exception("Post-processing failed for delete %s", path)
+
+    asyncio.create_task(_post_process())
     return {"status": "deleted", "path": path}
 
 
