@@ -78,6 +78,16 @@ class TestWriteNote:
         assert note["content"] == "Just markdown"
         assert note["metadata"] == {}
 
+    def test_write_with_no_metadata_omits_empty_frontmatter(self, vault_dir):
+        _with_vault(_writer.write_note, vault_dir, "bare.md", "Just markdown")
+
+        assert (vault_dir / "bare.md").read_text(encoding="utf-8") == "Just markdown"
+
+    def test_write_with_empty_metadata_omits_empty_frontmatter(self, vault_dir):
+        _with_vault(_writer.write_note, vault_dir, "bare.md", "Just markdown", {})
+
+        assert (vault_dir / "bare.md").read_text(encoding="utf-8") == "Just markdown"
+
 
 class TestDeleteNote:
     def test_delete_existing(self, vault_dir, sample_note):

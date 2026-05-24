@@ -8,8 +8,11 @@ def write_note(path: str, content: str, metadata: dict | None = None, vault: str
     full_path = vault_path(vault) / path
     full_path.parent.mkdir(parents=True, exist_ok=True)
 
-    post = frontmatter.Post(content, **(metadata or {}))
-    full_path.write_text(frontmatter.dumps(post), encoding="utf-8")
+    if metadata:
+        post = frontmatter.Post(content, **metadata)
+        content = frontmatter.dumps(post)
+
+    full_path.write_text(content, encoding="utf-8")
     return full_path
 
 
